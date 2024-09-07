@@ -10,6 +10,8 @@ CORS(app)
 # Define the key points of interest
 key_points_list = [1, 4, 7, 12, 16, 19, 21]
 last_point = 24
+base_volunteers_per_point = 2
+GROUP_SIZE = 3 
 
 
 
@@ -18,19 +20,6 @@ last_point = 24
 volunteers_df = pd.read_csv('volunteers.csv', encoding='utf-8')
 fence_points_df = pd.read_csv('fence_points.csv', encoding='utf-8')
 fence_points_df['importance'] = pd.to_numeric(fence_points_df['importance'], errors='coerce').fillna(10)
-
-
-
-def find_nearest_key_point(point_id):
-    if point_id == 24:
-        return 1
-    if point_id in key_points_list:
-        return point_id
-    before = [kp for kp in key_points_list if kp < point_id]
-    after = [kp for kp in key_points_list if kp > point_id]
-    if before and after:
-        return before[-1] if (point_id - before[-1]) <= (after[0] - point_id) else after[0]
-    return before[-1] if before else after[0]
 
 
 
@@ -43,7 +32,7 @@ def redistribute_volunteers(volunteers_df, key_points):
     max_key_points = num_volunteers // 2  # Each key point should have at least 2 volunteers
     sorted_key_points = key_points.sort_values(by='importance')
 
-    # Step 2: Determine how many volunteers each key point will receive
+    # Step 2: Determine which key points will be staffed
     if max_key_points < len(sorted_key_points):
         # Only staff the top X most important key points
         prioritized_key_points = sorted_key_points.head(max_key_points)
@@ -52,9 +41,8 @@ def redistribute_volunteers(volunteers_df, key_points):
         prioritized_key_points = sorted_key_points
 
     # Determine the base number of volunteers per key point
-    base_volunteers_per_point = 2
     extra_volunteers = num_volunteers - (base_volunteers_per_point * len(prioritized_key_points))
-    
+
     # Calculate the volunteers needed for each key point
     volunteers_needed = {point_id: base_volunteers_per_point for point_id in prioritized_key_points['point_id']}
     
@@ -64,26 +52,33 @@ def redistribute_volunteers(volunteers_df, key_points):
             volunteers_needed[point_id] += 1
             extra_volunteers -= 1
 
-    # Step 3: Assign volunteers to their nearest key points
+    # Step 3: Assign volunteers to key points by looping through key points
     volunteer_assignments = {point_id: [] for point_id in prioritized_key_points['point_id']}
     available_volunteers = volunteers_df.to_dict(orient='records')
 
-    # Sort volunteers by proximity to their closest key point
-    for volunteer in available_volunteers:
-        nearest_key_point = find_nearest_key_point(volunteer['closest_point'])
-        if nearest_key_point in volunteer_assignments and len(volunteer_assignments[nearest_key_point]) < volunteers_needed[nearest_key_point]:
-            volunteer_assignments[nearest_key_point].append(volunteer)
-            assigned_volunteers.add(volunteer['id'])
+    # Function to find the nearest available volunteer to a key point
+    def find_closest_volunteer(key_point, available_volunteers):
+        closest_volunteer = None
+        min_distance = float('inf')
+        for volunteer in available_volunteers:
+            if volunteer['id'] in assigned_volunteers:
+                continue  # Skip already assigned volunteers
+            distance = circular_distance(key_point, volunteer['closest_point'])
+            if distance < min_distance:
+                min_distance = distance
+                closest_volunteer = volunteer
+        return closest_volunteer
 
-    # Step 4: Handle extra volunteers
-    for volunteer in available_volunteers:
-        if volunteer['id'] not in assigned_volunteers:
-            # Try to find the next nearest key point that needs more volunteers
-            for point_id in prioritized_key_points['point_id']:
-                if len(volunteer_assignments[point_id]) < volunteers_needed[point_id]:
-                    volunteer_assignments[point_id].append(volunteer)
-                    assigned_volunteers.add(volunteer['id'])
-                    break
+    # Loop through prioritized key points and assign the closest volunteers
+    for point_id in prioritized_key_points['point_id']:
+        while len(volunteer_assignments[point_id]) < volunteers_needed[point_id]:
+            closest_volunteer = find_closest_volunteer(point_id, available_volunteers)
+            if closest_volunteer:
+                volunteer_assignments[point_id].append(closest_volunteer)
+                assigned_volunteers.add(closest_volunteer['id'])
+                available_volunteers.remove(closest_volunteer)
+            else:
+                break  # No more available volunteers
 
     # Convert assignment dictionary to a list of assignments
     assignments = [
@@ -95,6 +90,13 @@ def redistribute_volunteers(volunteers_df, key_points):
     ]
 
     return assignments, assigned_volunteers
+
+# Helper function for circular distance
+def circular_distance(p1, p2):
+    total_points = last_point
+    forward = (p2 - p1) % total_points
+    backward = (p1 - p2) % total_points
+    return min(forward, backward)
 
 def assign_volunteers():
     # Step 1: Filter available volunteers
@@ -165,26 +167,41 @@ def get_locations():
     for _, row in grouped.iterrows():
         location_name = row['location']
         volunteers = row['name']
-        # Split volunteers into groups of 6 or less, evenly dividing large groups
-        if len(volunteers) > 6:
-            half = len(volunteers) // 2
-            locations.append({
-                'name': f"{location_name} Group 1",
-                'volunteers': volunteers[:half]  # First half of volunteers
-            })
-            locations.append({
-                'name': f"{location_name} Group 2",
-                'volunteers': volunteers[half:]  # Second half of volunteers
-            })
+        total_volunteers = len(volunteers)
+
+        # Determine the maximum number of groups of size GROUP_SIZE
+        num_groups = total_volunteers // GROUP_SIZE  # Full groups we can form
+        remaining_volunteers = total_volunteers % GROUP_SIZE  # Volunteers left after forming full groups
+
+        if num_groups > 0 and remaining_volunteers >= num_groups:
+            # If remaining volunteers are enough to add one more volunteer to each group,
+            # split them evenly across all groups.
+            group_size = GROUP_SIZE + 1
+            groups = [volunteers[i * group_size:(i + 1) * group_size] for i in range(num_groups)]
+        elif num_groups > 0 and remaining_volunteers < num_groups:
+            # Redistribute volunteers across the groups to avoid a smaller group
+            # Increase the size of each group slightly to accommodate remaining volunteers
+            extra = remaining_volunteers
+            groups = []
+            start = 0
+            for i in range(num_groups):
+                group_size = GROUP_SIZE + (1 if extra > 0 else 0)
+                groups.append(volunteers[start:start + group_size])
+                start += group_size
+                if extra > 0:
+                    extra -= 1
         else:
+            # If we can't form full groups of the desired size, put all in one group
+            groups = [volunteers]
+
+        # Add each group to the locations list with names
+        for idx, group in enumerate(groups):
             locations.append({
-                'name': location_name,
-                'volunteers': volunteers
+                'name': f"{location_name} Group {idx + 1}",
+                'volunteers': group
             })
 
     return jsonify(locations)
-
-
 
 
 if __name__ == '__main__':
