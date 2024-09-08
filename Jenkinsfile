@@ -92,7 +92,7 @@ pipeline {
                         sh """
                         ssh -i "$secret" ${env.SSH_TARGET} "
                             sudo docker run -d --name frontend -p 3002:3002 \\
-                            -e REACT_APP_BACKEND_URL=http://<backend-ip>:5000 \\
+                            -e REACT_APP_BACKEND_URL=http://54.164.81.151:5000 \\
                             ${env.FRONTEND_IMAGE};
                         "
                         """
@@ -106,8 +106,8 @@ pipeline {
         always {
             // Clean up the workspace and remove images
             cleanWs()
-            sh "docker rmi ${env.BACKEND_IMAGE} || true"
-            sh "docker rmi ${env.FRONTEND_IMAGE} || true"
+            //sh "docker rmi ${env.BACKEND_IMAGE} || true"
+            //sh "docker rmi ${env.FRONTEND_IMAGE} || true"
         }
     }
 }
