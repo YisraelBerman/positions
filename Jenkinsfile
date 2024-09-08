@@ -6,7 +6,8 @@ pipeline {
     environment {
         GITHUB_TOKEN = credentials('github-token')
         GITHUB_USER = credentials('github-user')
-        SSH_TARGET = 'ubuntu@54.164.81.151' // Update with your server's IP or hostname
+        AWS_APPS_IP = credentials('AWS_apps_IP') 
+        SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
     }
 
     stages {
@@ -92,7 +93,7 @@ pipeline {
                         sh """
                         ssh -i "$secret" ${env.SSH_TARGET} "
                             sudo docker run -d --name frontend -p 3002:3002 \\
-                            -e REACT_APP_BACKEND_URL=http://54.164.81.151:5000 \\
+                            -e REACT_APP_BACKEND_URL=http://${env.AWS_APPS_IP}:5000 \\
                             ${env.FRONTEND_IMAGE};
                         "
                         """
