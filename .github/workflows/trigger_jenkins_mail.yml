@@ -3,7 +3,7 @@ name: Send Email to Trigger Jenkins
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   send_email:
