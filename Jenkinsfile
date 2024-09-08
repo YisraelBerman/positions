@@ -25,9 +25,7 @@ pipeline {
                 }
             }
         }
-    }
 
-    stages {
         stage('Test') {
             steps {
                 echo 'To be added someday.'
@@ -37,15 +35,15 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    sh "docker build -t ${BACKEND_IMAGE} -f ./app/backend/Dockerfile ./app/backend"
-                    sh "docker build -t ${FRONTEND_IMAGE} -f ./app/frontend/Dockerfile ./app/frontend"
+                    sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/Dockerfile ./app/backend"
+                    sh "docker build -t ${env.FRONTEND_IMAGE} -f ./app/frontend/Dockerfile ./app/frontend"
                 }
             }
         }
 
         stage('Docker Login') {
             steps {
-                sh "echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USER} --password-stdin"
+                sh "echo ${env.GITHUB_TOKEN} | docker login ghcr.io -u ${env.GITHUB_USER} --password-stdin"
             }
         }
 
@@ -53,10 +51,10 @@ pipeline {
             steps {
                 script {
                     // Push backend image to positions-backend repository
-                    sh "docker push ${BACKEND_IMAGE}"
+                    sh "docker push ${env.BACKEND_IMAGE}"
 
                     // Push frontend image to positions-frontend repository
-                    sh "docker push ${FRONTEND_IMAGE}"
+                    sh "docker push ${env.FRONTEND_IMAGE}"
                 }
             }
         }
@@ -67,7 +65,7 @@ pipeline {
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
                         // Stop and remove existing containers
                         sh """
-                        ssh -i "$secret" ${SSH_TARGET} "
+                        ssh -i "$secret" ${env.SSH_TARGET} "
                             sudo docker stop backend || true && sudo docker rm backend || true;
                             sudo docker stop frontend || true && sudo docker rm frontend || true;
                         "
@@ -75,27 +73,27 @@ pipeline {
                         
                         // Pull new images from the correct repositories
                         sh """
-                        ssh -i "$secret" ${SSH_TARGET} "
-                            sudo docker pull ${BACKEND_IMAGE};
-                            sudo docker pull ${FRONTEND_IMAGE};
+                        ssh -i "$secret" ${env.SSH_TARGET} "
+                            sudo docker pull ${env.BACKEND_IMAGE};
+                            sudo docker pull ${env.FRONTEND_IMAGE};
                         "
                         """
                         
                         // Run backend container
                         sh """
-                        ssh -i "$secret" ${SSH_TARGET} "
+                        ssh -i "$secret" ${env.SSH_TARGET} "
                             sudo docker run -d --name backend -p 5000:5000 \\
                             -e FLASK_ENV=production \\
-                            ${BACKEND_IMAGE};
+                            ${env.BACKEND_IMAGE};
                         "
                         """
                         
                         // Run frontend container
                         sh """
-                        ssh -i "$secret" ${SSH_TARGET} "
+                        ssh -i "$secret" ${env.SSH_TARGET} "
                             sudo docker run -d --name frontend -p 3002:3002 \\
                             -e REACT_APP_BACKEND_URL=http://<backend-ip>:5000 \\
-                            ${FRONTEND_IMAGE};
+                            ${env.FRONTEND_IMAGE};
                         "
                         """
                     }
@@ -108,8 +106,8 @@ pipeline {
         always {
             // Clean up the workspace and remove images
             cleanWs()
-            sh "docker rmi ${BACKEND_IMAGE} || true"
-            sh "docker rmi ${FRONTEND_IMAGE} || true"
+            sh "docker rmi ${env.BACKEND_IMAGE} || true"
+            sh "docker rmi ${env.FRONTEND_IMAGE} || true"
         }
     }
 }
