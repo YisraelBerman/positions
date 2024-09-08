@@ -35,8 +35,8 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/Dockerfile ./app/backend"
-                    sh "docker build -t ${env.FRONTEND_IMAGE} -f ./app/frontend/Dockerfile ./app/frontend"
+                    sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/dockerfile ./app/backend"
+                    sh "docker build -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"
                 }
             }
         }
