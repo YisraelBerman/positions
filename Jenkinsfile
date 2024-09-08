@@ -4,14 +4,27 @@ pipeline {
     }
 
     environment {
-        GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
-        SHORT_COMMIT = GIT_COMMIT_HASH[0..7]
-        BACKEND_IMAGE = "ghcr.io/yisraelberman/positions-backend:${SHORT_COMMIT}" // Backend repository
-        FRONTEND_IMAGE = "ghcr.io/yisraelberman/positions-frontend:${SHORT_COMMIT}" // Frontend repository
         GITHUB_TOKEN = credentials('github-token')
         GITHUB_USER = credentials('github-user')
         SSH_TARGET = 'ubuntu@54.164.81.151' // Update with your server's IP or hostname
     }
+
+    stages {
+        stage('Initialize') {
+            steps {
+                script {
+                    // Fetch the full commit hash
+                    env.GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
+                    
+                    // Extract the short commit hash
+                    env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
+                    
+                    // Define image names with commit tags
+                    env.BACKEND_IMAGE = "ghcr.io/yisraelberman/positions-backend:${env.SHORT_COMMIT}"
+                    env.FRONTEND_IMAGE = "ghcr.io/yisraelberman/positions-frontend:${env.SHORT_COMMIT}"
+                }
+            }
+        }
 
     stages {
         stage('Test') {
