@@ -1,83 +1,101 @@
 pipeline {
-    
     agent {
-	    label 'agent1'
+        label 'agent1'
     }
-    
 
     environment {
-	    def btime="${BUILD_TIMESTAMP}"
-	    GIT_COMMIT_HASH = sh (script: "git log -n 1 --pretty=format:'%H'", returnStdout: true) 
-	    SHORT_COMMIT = "${GIT_COMMIT_HASH[0..7]}"
-            BRANCH = "${env.gitlabBranch}"
-	    DOCKER_IMAGE_NAME = "positions:${SHORT_COMMIT}"
-            GITHUB_REPO = "yisraelberman/positions"
-            GITHUB_TOKEN = credentials('github-token')
-            GITHUB_USER = credentials('github-user')
-
+        GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
+        SHORT_COMMIT = GIT_COMMIT_HASH[0..7]
+        BACKEND_IMAGE = "ghcr.io/yisraelberman/positions-backend:${SHORT_COMMIT}" // Backend repository
+        FRONTEND_IMAGE = "ghcr.io/yisraelberman/positions-frontend:${SHORT_COMMIT}" // Frontend repository
+        GITHUB_TOKEN = credentials('github-token')
+        GITHUB_USER = credentials('github-user')
+        SSH_TARGET = 'ubuntu@54.164.81.151' // Update with your server's IP or hostname
     }
 
-
     stages {
-        // TODO add test
-		stage('test'){
-			steps {
-				echo 'To be added someday. '
-			
-
-			}
-		}
-        
-        stage('Build') {
+        stage('Test') {
             steps {
-                sh 'echo build'
-                // sh "docker build -t ${DOCKER_IMAGE_NAME} -f ./escape_room-Q-order/dockerfile ./escape_room-Q-order"
+                echo 'To be added someday.'
             }
         }
-/*
+
+        stage('Build') {
+            steps {
+                script {
+                    sh "docker build -t ${BACKEND_IMAGE} -f ./app/backend/Dockerfile ./app/backend"
+                    sh "docker build -t ${FRONTEND_IMAGE} -f ./app/frontend/Dockerfile ./app/frontend"
+                }
+            }
+        }
+
         stage('Docker Login') {
             steps {
                 sh "echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USER} --password-stdin"
             }
         }
 
-        stage('Push Image to GitHub') {
+        stage('Push Images to GitHub') {
             steps {
-                sh "docker tag ${DOCKER_IMAGE_NAME} ghcr.io/${GITHUB_REPO}:${SHORT_COMMIT}"
-                sh "docker push ghcr.io/${GITHUB_REPO}:${SHORT_COMMIT}"
-                sh "docker tag ${DOCKER_IMAGE_NAME} ghcr.io/${GITHUB_REPO}:latest"
-                sh "docker push ghcr.io/${GITHUB_REPO}:latest"
+                script {
+                    // Push backend image to positions-backend repository
+                    sh "docker push ${BACKEND_IMAGE}"
+
+                    // Push frontend image to positions-frontend repository
+                    sh "docker push ${FRONTEND_IMAGE}"
+                }
             }
         }
 
-        stage('deploy'){
-			steps {
-				script{
+        stage('Deploy') {
+            steps {
+                script {
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
-                	
-						script {
-                            
-                            // on first connection add:  -o StrictHostKeyChecking=no
-                            sh 'ssh -i "$secret" ubuntu@54.164.81.151 "sudo docker stop bm-app && docker rm bm-app"'
-                            
-                            sh 'ssh -i "$secret" ubuntu@54.164.81.151 "sudo docker run -d -p 3000:3000 --name bm-app ghcr.io/yisraelberman/escape-room:${SHORT_COMMIT}"'
-
-						}
-            		}
-            	}
-
-			}
-		}*/
+                        // Stop and remove existing containers
+                        sh """
+                        ssh -i "$secret" ${SSH_TARGET} "
+                            sudo docker stop backend || true && sudo docker rm backend || true;
+                            sudo docker stop frontend || true && sudo docker rm frontend || true;
+                        "
+                        """
+                        
+                        // Pull new images from the correct repositories
+                        sh """
+                        ssh -i "$secret" ${SSH_TARGET} "
+                            sudo docker pull ${BACKEND_IMAGE};
+                            sudo docker pull ${FRONTEND_IMAGE};
+                        "
+                        """
+                        
+                        // Run backend container
+                        sh """
+                        ssh -i "$secret" ${SSH_TARGET} "
+                            sudo docker run -d --name backend -p 5000:5000 \\
+                            -e FLASK_ENV=production \\
+                            ${BACKEND_IMAGE};
+                        "
+                        """
+                        
+                        // Run frontend container
+                        sh """
+                        ssh -i "$secret" ${SSH_TARGET} "
+                            sudo docker run -d --name frontend -p 3002:3002 \\
+                            -e REACT_APP_BACKEND_URL=http://<backend-ip>:5000 \\
+                            ${FRONTEND_IMAGE};
+                        "
+                        """
+                    }
+                }
+            }
+        }
     }
-    
-    
+
     post {
         always {
-            // Clean up the workspace
+            // Clean up the workspace and remove images
             cleanWs()
-            sh "docker rmi ${DOCKER_IMAGE_NAME} || true"
-
-           
+            sh "docker rmi ${BACKEND_IMAGE} || true"
+            sh "docker rmi ${FRONTEND_IMAGE} || true"
         }
     }
 }
