@@ -34,13 +34,32 @@ pipeline {
         }
 
         stage('Build') {
-            steps {
-                script {
-                    sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/dockerfile ./app/backend"
-                    sh "docker build -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"
+            parallel {
+                stage('Build Backend') {
+                    when {
+                        changeset "app/backend/**"
+                    }
+                    steps {
+                        script {
+                            echo 'Changes detected in the backend directory. Building backend image...'
+                            sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/dockerfile ./app/backend"
+                        }
+                    }
+                }
+                stage('Build Frontend') {
+                    when {
+                        changeset "app/frontend/**"
+                    }
+                    steps {
+                        script {
+                            echo 'Changes detected in the frontend directory. Building frontend image...'
+                            sh "docker build -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"
+                        }
+                    }
                 }
             }
         }
+
 
         stage('Docker Login') {
             steps {
