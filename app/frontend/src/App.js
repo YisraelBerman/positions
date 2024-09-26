@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import VolunteerList from './VolunteerList';
 import Assignments from './Assignments';
 import MapPage from './MapPage';
-import Header from './Header'; // Import the new header component
+import Header from './Header'; 
 import axios from './axiosConfig';
 
 function App() {
