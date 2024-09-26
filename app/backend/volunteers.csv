@@ -1,35 +1,35 @@
 id,name,location,available,closest_point
 1,ישראל,D,True,9
 2,שגיא,A,True,1
-3,אורי ג,B,True,14
-4,יעקב נ,D,True,12
+3,אורי,B,True,14
+4,יעקב,D,True,12
 5,בנימין,B,True,16
-6,נאור,A,False,19
+6,אור,A,False,19
 7,אריאל,A,True,21
-8,חיים פ,A,False,24
+8,חיים,A,False,24
 9,רועי,C,True,4
 10,דורון,D,True,8
 11,צחי,D,True,11
 12,דודו,B,True,16
-13,אודי ש,A,True,19
+13,אהוד,A,True,19
 14,מולי,A,True,21
-15,חיים ג,C,False,6
-16,נתנאל ג,D,True,5
+15,שמעון,C,False,6
+16,נתנאל,D,True,5
 17,יניב,D,True,11
-18,מקס,D,False,12
+18,מאיר,D,False,12
 19,יוסי,B,False,14
 20,אברהם,A,True,19
 21,מוטי,B,True,18
 22,אלחנן,D,False,6
-23,דובי,A,True,22
-24,דני,A,False,21
+23,דוב,A,True,22
+24,דניאל,A,False,21
 25,טמיר,C,True,3
 26,יוסף,D,True,9
 27,כפיר,B,False,16
-28,שגאו,C,True,5
+28,אולג,C,True,5
 29,בעז,B,True,17
-30,דוד ע,A,True,1
-31,יעקב ש,A,True,19
-32,רזיאל,D,True,8
+30,דוד,A,True,1
+31,קובי,A,True,19
+32,עזריאל,D,True,8
 33,יאיר,D,True,8
 34,יורם,A,True,21
