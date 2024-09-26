@@ -29,13 +29,13 @@ pipeline {
                     env.BUILD_FRONTEND = 'false'
                 }
             }
-        }
+        } // Initialize
 
         stage('Test') {
             steps {
                 echo 'To be added someday.'
             }
-        }
+        } // test
 
         stage('Build') {
             parallel {
@@ -47,10 +47,10 @@ pipeline {
                         script {
                             echo 'Changes detected in the backend directory. Building backend image...'
                             sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/dockerfile ./app/backend"
-                            env.BUILD_BACKEND = 'true' // Set flag to true if backend is built
+                            env.BUILD_BACKEND = 'true' 
                         }
                     }
-                }
+                } // Build Backend
                 stage('Build Frontend') {
                     when {
                         changeset "app/frontend/**"
@@ -59,12 +59,12 @@ pipeline {
                         script {
                             echo 'Changes detected in the frontend directory. Building frontend image...'
                             sh "docker build -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"
-                            env.BUILD_FRONTEND = 'true' // Set flag to true if frontend is built
+                            env.BUILD_FRONTEND = 'true' 
                         }
                     }
-                }
+                } // Build Frontend
             }
-        }
+        } // Build
 
         stage('Docker Login') {
             when {
@@ -73,7 +73,7 @@ pipeline {
             steps {
                 sh "echo ${env.GITHUB_TOKEN} | docker login ghcr.io -u ${env.GITHUB_USER} --password-stdin"
             }
-        }
+        } // Docker Login
 
         stage('Push Images to GitHub') {
             parallel {
@@ -100,8 +100,9 @@ pipeline {
                     }
                 }
             }
-        }
+        } // Push Images to GitHub
 
+        // Stop and remove existing containers and Pull new images from the correct repositories and run them
         stage('Deploy') {
             when {
                 expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
@@ -109,35 +110,12 @@ pipeline {
             steps {
                 script {
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
-                        // Stop and remove existing containers
-                        sh """
-                        ssh -i "$secret" ${env.SSH_TARGET} "
-                            sudo docker stop backend || true && sudo docker rm backend || true;
-                            sudo docker stop frontend || true && sudo docker rm frontend || true;
-                        "
-                        """
                         
-                        // Pull new images from the correct repositories
                         if (env.BUILD_BACKEND == 'true') {
                             sh """
                             ssh -i "$secret" ${env.SSH_TARGET} "
+                                sudo docker stop backend || true && sudo docker rm backend || true;
                                 sudo docker pull ${env.BACKEND_IMAGE};
-                            "
-                            """
-                        }
-                        
-                        if (env.BUILD_FRONTEND == 'true') {
-                            sh """
-                            ssh -i "$secret" ${env.SSH_TARGET} "
-                                sudo docker pull ${env.FRONTEND_IMAGE};
-                            "
-                            """
-                        }
-                        
-                        // Run backend container if built
-                        if (env.BUILD_BACKEND == 'true') {
-                            sh """
-                            ssh -i "$secret" ${env.SSH_TARGET} "
                                 sudo docker run -d --name backend -p 5000:5000 \\
                                 -e FLASK_ENV=production \\
                                 ${env.BACKEND_IMAGE};
@@ -145,21 +123,22 @@ pipeline {
                             """
                         }
                         
-                        // Run frontend container if built
                         if (env.BUILD_FRONTEND == 'true') {
                             sh """
                             ssh -i "$secret" ${env.SSH_TARGET} "
+                                sudo docker stop frontend || true && sudo docker rm frontend || true;
+                                sudo docker pull ${env.FRONTEND_IMAGE};
                                 sudo docker run -d --name frontend -p 3002:3002 \\
                                 -e REACT_APP_BACKEND_URL=http://${env.AWS_APPS_IP}:5000 \\
                                 ${env.FRONTEND_IMAGE};
                             "
                             """
                         }
-                    }
+                    } 
                 }
             }
-        }
-    }
+        } // deploy
+    } // stages
 
     post {
         always {
