@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import VolunteerList from './VolunteerList';
 import Assignments from './Assignments';
 import MapPage from './MapPage';
-import Header from './Header'; 
+import Header from './Header';
 import axios from './axiosConfig';
+import { AuthProvider } from './contexts/AuthContext';
+import Login from './components/Login';
+import { useAuth } from './contexts/AuthContext'; // Assuming you've created a custom hook
 
 function App() {
   const [volunteers, setVolunteers] = useState([]);
@@ -74,35 +77,39 @@ function App() {
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   };
 
+  // Create a PrivateRoute component
+  const PrivateRoute = ({ children }) => {
+    const { user } = useAuth();
+    return user ? children : <Navigate to="/login" />;
+  };
+
   return (
-    <Router>
-      <div className="App">
-        <Header /> {/* Display the header on all pages */}
-        <Routes>
-          <Route path="/map" element={<MapPage />} />
-          <Route
-            path="/"
-            element={
-              <div style={mainPageStyle}>
-                <div style={{ ...sectionStyle, width: '100%' }}>
-                  <VolunteerList volunteers={volunteers} onStatusChange={handleStatusChange} />
-                </div>
-                <div style={contentStyle}>
-                  <div style={sectionStyle}>
-                    <h2>עמדות</h2>
-                    <Assignments assignments={assignments} />
-                  </div>
-                  <div style={sectionStyle}>
-                    <h2>שכונות</h2>
-                    <Assignments assignments={[]} locations={locations} /> {/* Pass locations only */}
-                  </div>
-                </div>
+    <AuthProvider>
+      <Router>
+        <div className="App">
+          <Header />
+          <Login />
+          <div style={mainPageStyle}>
+            <div style={{ ...sectionStyle, width: '100%' }}>
+              <VolunteerList volunteers={volunteers} onStatusChange={handleStatusChange} />
+            </div>
+            <div style={contentStyle}>
+              <div style={sectionStyle}>
+                <h2>עמדות</h2>
+                <Assignments assignments={assignments} />
               </div>
-            }
-          />
-        </Routes>
-      </div>
-    </Router>
+              <div style={sectionStyle}>
+                <h2>שכונות</h2>
+                <Assignments assignments={[]} locations={locations} />
+              </div>
+            </div>
+          </div>
+          <Routes>
+            <Route path="/map" element={<MapPage />} />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

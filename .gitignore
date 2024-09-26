@@ -17,7 +17,8 @@
 !/app/frontend/
 
 # Allow specific backend files
-!/app/backend/app.py
+!/app/backend/*.py
+!/app/backend/users.csv
 !/app/backend/requirements.txt
 !/app/backend/dockerfile
 !/app/backend/.dockerignore

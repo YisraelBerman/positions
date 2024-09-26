@@ -1,7 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
+
 function Header() {
+
   const headerStyle = {
     display: 'flex',
     justifyContent: 'space-between',
@@ -27,6 +29,7 @@ function Header() {
         <button style={buttonStyle}>Map</button>
       </Link>
       <button style={buttonStyle}>Send Messages</button> {/* Placeholder button */}
+
     </header>
   );
 }

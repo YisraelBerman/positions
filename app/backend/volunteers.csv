@@ -27,7 +27,7 @@ id,name,location,available,closest_point
 26,יוסף,D,True,9
 27,כפיר,B,False,16
 28,אולג,C,True,5
-29,בעז,B,True,17
+29,בעז,B,False,17
 30,דוד,A,True,1
 31,קובי,A,True,19
 32,עזריאל,D,True,8

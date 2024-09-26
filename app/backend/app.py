@@ -1,9 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 import pandas as pd
+from config import Config
+from models import UserStore
 
 app = Flask(__name__)
-CORS(app)
+app.config.from_object(Config)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+jwt = JWTManager(app)
 
 
 
@@ -19,6 +24,8 @@ GROUP_SIZE = 3
 volunteers_df = pd.read_csv('volunteers.csv', encoding='utf-8')
 fence_points_df = pd.read_csv('fence_points.csv', encoding='utf-8')
 fence_points_df['importance'] = pd.to_numeric(fence_points_df['importance'], errors='coerce').fillna(10)
+# Initialize UserStore
+user_store = UserStore('users.csv')
 
 
 
@@ -115,12 +122,37 @@ def assign_volunteers():
 
     return assignments
 
+@app.route('/api/login', methods=['POST'])
+def login():
+    username = request.json.get('username', None)
+    password = request.json.get('password', None)
+    print(f"Login attempt: username={username}, password={'*' * len(password)}")  # Debug print
+    
+    user = user_store.get_user(username)
+    if user:
+        print(f"User found: {user.username}, role: {user.role}")  # Debug print
+        if user.check_password(password):
+            access_token = create_access_token(identity={'username': username, 'role': user.role})
+            print("Login successful")  # Debug print
+            return jsonify(access_token=access_token, username=username), 200
+        else:
+            print("Password incorrect")  # Debug print
+    else:
+        print("User not found")  # Debug print
+    
+    return jsonify({"msg": "Bad username or password"}), 401
+
 @app.route('/api/volunteers', methods=['GET'])
 def get_volunteers():
     return jsonify(volunteers_df.to_dict(orient='records'))
 
 @app.route('/api/update_status', methods=['POST'])
+@jwt_required()
 def update_status():
+    current_user = get_jwt_identity()
+    if current_user['role'] not in ['user', 'admin']:
+        return jsonify({"msg": "Insufficient permissions"}), 403
+    
     global volunteers_df  # Ensure volunteers_df is correctly used as global
 
     data = request.json
@@ -145,6 +177,16 @@ def update_status():
     else:
         print("Volunteer not found.")  # Debugging line
         return jsonify({'status': 'error', 'message': 'Volunteer not found.'}), 404
+
+@app.route('/api/admin_action', methods=['POST'])
+@jwt_required()
+def admin_action():
+    current_user = get_jwt_identity()
+    if current_user['role'] != 'admin':
+        return jsonify({"msg": "Admin access required"}), 403
+    
+    # Admin-only logic here...
+
 
 @app.route('/api/assignments', methods=['GET'])
 def get_assignments():
