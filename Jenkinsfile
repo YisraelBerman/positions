@@ -29,13 +29,13 @@ pipeline {
                     env.BUILD_FRONTEND = 'false'
                 }
             }
-        }
+        } // Initialize
 
         stage('Test') {
             steps {
                 echo 'To be added someday.'
             }
-        }
+        } // test
 
         stage('Build') {
             parallel {
@@ -47,10 +47,10 @@ pipeline {
                         script {
                             echo 'Changes detected in the backend directory. Building backend image...'
                             sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/dockerfile ./app/backend"
-                            env.BUILD_BACKEND = 'true' // Set flag to true if backend is built
+                            env.BUILD_BACKEND = 'true' 
                         }
                     }
-                }
+                } // Build Backend
                 stage('Build Frontend') {
                     when {
                         changeset "app/frontend/**"
@@ -59,12 +59,12 @@ pipeline {
                         script {
                             echo 'Changes detected in the frontend directory. Building frontend image...'
                             sh "docker build -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"
-                            env.BUILD_FRONTEND = 'true' // Set flag to true if frontend is built
+                            env.BUILD_FRONTEND = 'true' 
                         }
                     }
-                }
+                } // Build Frontend
             }
-        }
+        } // Build
 
         stage('Docker Login') {
             when {
@@ -73,7 +73,7 @@ pipeline {
             steps {
                 sh "echo ${env.GITHUB_TOKEN} | docker login ghcr.io -u ${env.GITHUB_USER} --password-stdin"
             }
-        }
+        } // Docker Login
 
         stage('Push Images to GitHub') {
             parallel {
@@ -100,8 +100,9 @@ pipeline {
                     }
                 }
             }
-        }
+        } // Push Images to GitHub
 
+        // Stop and remove existing containers and Pull new images from the correct repositories and run them
         stage('Deploy') {
             when {
                 expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
@@ -110,7 +111,6 @@ pipeline {
                 script {
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
                         
-                        // Stop and remove existing containers and Pull new images from the correct repositories and run them
                         if (env.BUILD_BACKEND == 'true') {
                             sh """
                             ssh -i "$secret" ${env.SSH_TARGET} "
@@ -134,11 +134,11 @@ pipeline {
                             "
                             """
                         }
-                    }
+                    } 
                 }
             }
-        }
-    }
+        } // deploy
+    } // stages
 
     post {
         always {
