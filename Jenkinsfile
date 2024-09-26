@@ -109,35 +109,13 @@ pipeline {
             steps {
                 script {
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
-                        // Stop and remove existing containers
-                        sh """
-                        ssh -i "$secret" ${env.SSH_TARGET} "
-                            sudo docker stop backend || true && sudo docker rm backend || true;
-                            sudo docker stop frontend || true && sudo docker rm frontend || true;
-                        "
-                        """
                         
-                        // Pull new images from the correct repositories
+                        // Stop and remove existing containers and Pull new images from the correct repositories and run them
                         if (env.BUILD_BACKEND == 'true') {
                             sh """
                             ssh -i "$secret" ${env.SSH_TARGET} "
+                                sudo docker stop backend || true && sudo docker rm backend || true;
                                 sudo docker pull ${env.BACKEND_IMAGE};
-                            "
-                            """
-                        }
-                        
-                        if (env.BUILD_FRONTEND == 'true') {
-                            sh """
-                            ssh -i "$secret" ${env.SSH_TARGET} "
-                                sudo docker pull ${env.FRONTEND_IMAGE};
-                            "
-                            """
-                        }
-                        
-                        // Run backend container if built
-                        if (env.BUILD_BACKEND == 'true') {
-                            sh """
-                            ssh -i "$secret" ${env.SSH_TARGET} "
                                 sudo docker run -d --name backend -p 5000:5000 \\
                                 -e FLASK_ENV=production \\
                                 ${env.BACKEND_IMAGE};
@@ -145,10 +123,11 @@ pipeline {
                             """
                         }
                         
-                        // Run frontend container if built
                         if (env.BUILD_FRONTEND == 'true') {
                             sh """
                             ssh -i "$secret" ${env.SSH_TARGET} "
+                                sudo docker stop frontend || true && sudo docker rm frontend || true;
+                                sudo docker pull ${env.FRONTEND_IMAGE};
                                 sudo docker run -d --name frontend -p 3002:3002 \\
                                 -e REACT_APP_BACKEND_URL=http://${env.AWS_APPS_IP}:5000 \\
                                 ${env.FRONTEND_IMAGE};
