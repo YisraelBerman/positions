@@ -36,6 +36,11 @@
 !/app/frontend/public/
 !/app/frontend/src/
 
+!/app/frontend/src/components/
+!/app/frontend/src/contexts/
+!/app/frontend/src/services/
+
+
 # Allow .js, .html, .css files inside specific frontend subdirectories
 !/app/frontend/public/*.js
 !/app/frontend/public/*.html
@@ -43,6 +48,15 @@
 !/app/frontend/src/*.js
 !/app/frontend/src/*.html
 !/app/frontend/src/*.css
+
+
+
+!/app/frontend/src/components/*
+!/app/frontend/src/contexts/*
+!/app/frontend/src/services/*
+
+
+
 
 # Exclude common files and directories that should remain ignored
 /app/frontend/node_modules/
