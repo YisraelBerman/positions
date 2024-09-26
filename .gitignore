@@ -1,0 +1,53 @@
+# Ignore everything by default
+/**
+
+# Allow specific pipeline files
+!/Jenkinsfile
+!/.github
+!/.github/workflows
+!/.github/workflows/trigger_jenkins_mail.yml
+
+#Allow docker-compose
+!/app/docker-compose.yaml
+!/app/remote_docker_compose.yaml
+
+# Allow specific backend and frontend directories
+!/app/
+!/app/backend/
+!/app/frontend/
+
+# Allow specific backend files
+!/app/backend/app.py
+!/app/backend/requirements.txt
+!/app/backend/dockerfile
+!/app/backend/.dockerignore
+
+# DB files
+!/app/backend/fence_points.csv
+!/app/backend/volunteers.csv
+
+# Allow specific frontend files
+!/app/frontend/dockerfile
+!/app/frontend/.dockerignore
+!/app/frontend/package.json
+
+# Allow specific subdirectories in frontend
+!/app/frontend/public/
+!/app/frontend/src/
+
+# Allow .js, .html, .css files inside specific frontend subdirectories
+!/app/frontend/public/*.js
+!/app/frontend/public/*.html
+!/app/frontend/public/*.css
+!/app/frontend/src/*.js
+!/app/frontend/src/*.html
+!/app/frontend/src/*.css
+
+# Exclude common files and directories that should remain ignored
+/app/frontend/node_modules/
+/app/backend/venv/
+
+
+!.gitignore
+!README.md
+!**/README.md

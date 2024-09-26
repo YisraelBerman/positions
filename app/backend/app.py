@@ -190,7 +190,7 @@ def get_locations():
                 if extra > 0:
                     extra -= 1
         else:
-            # If we can't form full groups of the desired size, put all in one group
+            # If we can't form full groups of the desired size, put all in one group 
             groups = [volunteers]
 
         # Add each group to the locations list with names
