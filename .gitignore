@@ -35,6 +35,7 @@
 !/app/frontend/public/
 !/app/frontend/src/
 
+
 # Allow .js, .html, .css files inside specific frontend subdirectories
 !/app/frontend/public/*.js
 !/app/frontend/public/*.html
@@ -42,6 +43,11 @@
 !/app/frontend/src/*.js
 !/app/frontend/src/*.html
 !/app/frontend/src/*.css
+
+# allow Keycloak files
+!/app/keycloak/
+!/app/keycloak/docker-compose.yml
+
 
 # Exclude common files and directories that should remain ignored
 /app/frontend/node_modules/
