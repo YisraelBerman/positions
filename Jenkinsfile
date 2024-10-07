@@ -11,6 +11,24 @@ pipeline {
     }
 
     stages {
+        stage('Check Changes') {
+            steps {
+                script {
+                    // Get the list of changed files
+                    def changedFiles = sh(script: "git diff --name-only HEAD~1 HEAD", returnStdout: true).trim()
+                    
+                    // Check if changes are only in the keycloak directory
+                    def onlyKeycloakChanged = changedFiles.split('\n').every { it.startsWith('keycloak/') }
+                    
+                    if (onlyKeycloakChanged) {
+                        echo "Changes only in keycloak directory. Skipping pipeline execution."
+                        currentBuild.result = 'NOT_BUILT'
+                        return
+                    }
+                }
+            }
+        }
+        
         stage('Initialize') {
             steps {
                 script {
