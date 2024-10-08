@@ -1,10 +1,9 @@
 import Keycloak from 'keycloak-js';
 
-// const keycloakUrl = process.env.REACT_APP_KEYCLOAK_URL || 'http://localhost:8080';
+const keycloakUrl = process.env.REACT_APP_KEYCLOAK_URL || 'http://localhost:8080';
 
 const keycloakConfig = {
-  //url: keycloakUrl,
-  url: 'https://34.205.129.2:8443',
+  url: keycloakUrl,
   realm: 'my-app-realm',
   clientId: 'my-app-client'
 };
