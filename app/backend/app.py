@@ -87,7 +87,7 @@ def redistribute_volunteers(volunteers_df, key_points):
             'volunteers': [v['name'] for v in volunteers]
         } for point_id, volunteers in volunteer_assignments.items() if volunteers
     ]
-    
+
     return assignments, assigned_volunteers
 
 # Helper function for circular distance
@@ -112,7 +112,6 @@ def assign_volunteers():
     if not unassigned_volunteers.empty:
         print("Warning: Some volunteers were not assigned.")
         print("Unassigned volunteers:", unassigned_volunteers.to_dict(orient='records'))
-
     return assignments
 
 @app.route('/api/volunteers', methods=['GET'])
