@@ -14,6 +14,8 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
+    volumes:
+      - ./certs:/opt/keycloak/certs
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
@@ -21,17 +23,20 @@ services:
       KC_DB_PASSWORD: password
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_HOSTNAME_STRICT: "false"           #for http
-      KC_HOSTNAME_STRICT_HTTPS: "false"         #for http
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/tls.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/tls.key
+      KC_HOSTNAME: "<IP>"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY: edge
     ports:
+      - "8443:8443"
       - "8080:8080"
     depends_on:
       - postgres
     command:
-      - start-dev
-      - --http-enabled=true           #for http
-      - --hostname-strict=false          #for http
-      - --hostname-strict-https=false           #for http
+      - start
     networks:
       - keycloak-network
 
