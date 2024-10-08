@@ -7,6 +7,7 @@ pipeline {
         GITHUB_TOKEN = credentials('github-token')
         GITHUB_USER = credentials('github-user')
         AWS_APPS_IP = credentials('AWS_apps_IP') 
+        AWS_KEYCLOAK_IP = credentials('AWS_keycloak_IP')
         SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
     }
 
@@ -151,6 +152,7 @@ pipeline {
                                 sudo docker pull ${env.FRONTEND_IMAGE};
                                 sudo docker run -d --name frontend -p 3002:3002 \\
                                 -e REACT_APP_BACKEND_URL=http://${env.AWS_APPS_IP}:5000 \\
+                                -e REACT_APP_KEYCLOAK_URL=http://${env.AWS_KEYCLOAK_IP}:8080 \\
                                 ${env.FRONTEND_IMAGE};
                             "
                             """
