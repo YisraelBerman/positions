@@ -112,6 +112,7 @@ def assign_volunteers():
     if not unassigned_volunteers.empty:
         print("Warning: Some volunteers were not assigned.")
         print("Unassigned volunteers:", unassigned_volunteers.to_dict(orient='records'))
+    
     return assignments
 
 @app.route('/api/volunteers', methods=['GET'])
