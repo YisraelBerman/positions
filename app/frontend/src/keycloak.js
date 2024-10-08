@@ -4,7 +4,7 @@ import Keycloak from 'keycloak-js';
 
 const keycloakConfig = {
   //url: keycloakUrl,
-  url: 'http://34.205.129.2:8443',
+  url: 'https://34.205.129.2:8443',
   realm: 'my-app-realm',
   clientId: 'my-app-client'
 };
