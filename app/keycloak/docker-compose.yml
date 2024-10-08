@@ -21,12 +21,17 @@ services:
       KC_DB_PASSWORD: password
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME_STRICT: "false"           #for http
+      KC_HOSTNAME_STRICT_HTTPS: "false"         #for http
     ports:
       - "8080:8080"
     depends_on:
       - postgres
     command:
       - start-dev
+      - --http-enabled=true           #for http
+      - --hostname-strict=false          #for http
+      - --hostname-strict-https=false           #for http
     networks:
       - keycloak-network
 
