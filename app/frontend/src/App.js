@@ -15,21 +15,21 @@ function App() {
 
   useEffect(() => {
     const initKeycloak = async () => {
-      if (!keycloakInitialized) {
-        try {
-          const authenticated = await keycloak.init({ onLoad: 'login-required' });
-          setKeycloakInitialized(true);
-          if (authenticated) {
-            fetchData();
-          }
-        } catch (error) {
-          console.error('Keycloak initialization error:', error);
+      try {
+        const authenticated = await keycloak.init({ onLoad: 'login-required' });
+        setKeycloakInitialized(true);
+        if (authenticated) {
+          fetchData();
         }
+      } catch (error) {
+        console.error('Keycloak initialization error:', error);
       }
     };
 
-    initKeycloak();
-  }, []);
+    if (!keycloakInitialized) {
+      initKeycloak();
+    }
+  }, [keycloakInitialized]);
 
   const fetchData = () => {
     fetchVolunteers();
