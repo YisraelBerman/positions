@@ -13,7 +13,7 @@ import traceback
 
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'http://localhost:3000')}})
 
 # Keycloak configuration
 KEYCLOAK_URL = os.environ.get('KEYCLOAK_URL', "https://3.86.189.1:8443")

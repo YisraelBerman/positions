@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import Keycloak from 'keycloak-js';
 
 const keycloakConfig = {
-  url: 'https://3.86.189.1:8443',
-  realm: 'my-app-realm',
-  clientId: 'my-app-client'
-};
+    url: process.env.REACT_APP_KEYCLOAK_URL || 'https://3.86.189.1:8443',
+    realm: process.env.REACT_APP_KEYCLOAK_REALM || 'my-app-realm',
+    clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'my-app-client'
+  };
 
 const useKeycloak = () => {
   const [keycloak, setKeycloak] = useState(null);
