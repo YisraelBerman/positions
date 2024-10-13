@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import VolunteerList from './VolunteerList';
 import Assignments from './Assignments';
@@ -6,22 +6,30 @@ import MapPage from './MapPage';
 import Header from './Header'; 
 import axios, { setAxiosAuth } from './axiosConfig';
 import useKeycloak from './useKeycloak';
+import { debounce } from 'lodash';
 
 function App() {
   const [volunteers, setVolunteers] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [lastFetchTime, setLastFetchTime] = useState(0);
   const { keycloak, initialized, isAuthenticated, login } = useKeycloak();
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (force = false) => {
     if (!keycloak || !keycloak.token) {
       console.error('No token available');
       return;
     }
 
+    const now = Date.now();
+    if (!force && now - lastFetchTime < 60000) { // 1 minute cache
+      return;
+    }
+
+    setLoading(true);
     try {
       console.log('Fetching data...');
-      console.log('Current token:', keycloak.token);
       
       const config = {
         headers: { Authorization: `Bearer ${keycloak.token}` }
@@ -34,32 +42,37 @@ function App() {
       ]);
 
       console.log('Data fetched successfully');
-      setVolunteers(volunteersRes.data);
-      setAssignments(assignmentsRes.data);
-      setLocations(locationsRes.data);
+      setVolunteers(volunteersRes.data || []);
+      setAssignments(assignmentsRes.data || []);
+      setLocations(locationsRes.data || []);
+      setLastFetchTime(now);
     } catch (error) {
       console.error('Error fetching data:', error);
-      if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-        console.error('Response headers:', error.response.headers);
-      }
+      setVolunteers([]);
+      setAssignments([]);
+      setLocations([]);
+    } finally {
+      setLoading(false);
     }
-  }, [keycloak]);
+  }, [keycloak, lastFetchTime]);
+
+  const debouncedFetchData = useMemo(
+    () => debounce(fetchData, 1000),
+    [fetchData]
+  );
 
   useEffect(() => {
-    if (initialized) {
-      if (isAuthenticated) {
-        console.log('User is authenticated');
-        console.log('Token available:', !!keycloak.token);
-        setAxiosAuth(keycloak);
-        fetchData();
-      } else {
-        console.log('User is not authenticated, redirecting to login...');
-        login();
-      }
+    if (initialized && isAuthenticated && keycloak) {
+      setAxiosAuth(keycloak);
+      debouncedFetchData();
+    } else if (initialized && !isAuthenticated) {
+      login();
     }
-  }, [initialized, isAuthenticated, keycloak, login, fetchData]);
+  }, [initialized, isAuthenticated, keycloak, login, debouncedFetchData]);
+
+  const handleStatusChange = useCallback(() => {
+    fetchData(true);
+  }, [fetchData]);
 
   if (!initialized) {
     return <div>Loading...</div>;
@@ -73,29 +86,33 @@ function App() {
     <Router>
       <div className="App">
         <Header />
-        <Routes>
-          <Route path="/map" element={<MapPage />} />
-          <Route
-            path="/"
-            element={
-              <div style={mainPageStyle}>
-                <div style={{ ...sectionStyle, width: '100%' }}>
-                  <VolunteerList volunteers={volunteers} onStatusChange={fetchData} />
-                </div>
-                <div style={contentStyle}>
-                  <div style={sectionStyle}>
-                    <h2>עמדות</h2>
-                    <Assignments assignments={assignments} />
+        {loading ? (
+          <div>Loading data...</div>
+        ) : (
+          <Routes>
+            <Route path="/map" element={<MapPage />} />
+            <Route
+              path="/"
+              element={
+                <div style={mainPageStyle}>
+                  <div style={{ ...sectionStyle, width: '100%' }}>
+                    <VolunteerList volunteers={volunteers} onStatusChange={handleStatusChange} />
                   </div>
-                  <div style={sectionStyle}>
-                    <h2>שכונות</h2>
-                    <Assignments assignments={[]} locations={locations} />
+                  <div style={contentStyle}>
+                    <div style={sectionStyle}>
+                      <h2>עמדות</h2>
+                      <Assignments assignments={assignments} />
+                    </div>
+                    <div style={sectionStyle}>
+                      <h2>שכונות</h2>
+                      <Assignments assignments={[]} locations={locations} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            }
-          />
-        </Routes>
+              }
+            />
+          </Routes>
+        )}
       </div>
     </Router>
   );
