@@ -1,10 +1,55 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, verify_jwt_in_request
+from jose import jwt, JWTError
 import pandas as pd
+import requests
+from functools import wraps
 
 app = Flask(__name__)
 CORS(app)
 
+# Keycloak configuration
+KEYCLOAK_URL = 'https://3.86.189.1:8443'
+REALM_NAME = 'my-app-realm'
+CLIENT_ID = 'my-app-client'
+
+# JWT configuration
+app.config['JWT_ALGORITHM'] = 'RS256'
+app.config['JWT_PUBLIC_KEY'] = """-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4XGntpxbcfnw5kbYPuXn
+yzpKi22GtWRXr9i/Ra/LkMFGCpoRjwde2w+FMppGau3oCl29n7kmz/RdZlMyM4Ts
+0XI4GaUnzlUpyPmFqAEZ+LHUu0jB4P3OwN/vpc6NdbIHZGb4p5xSrYUWzAjfJSHW
+pXwlGy3VVsL/VZUZET0JDe3mlfMj9hhI1aT6gMbTpVotuciru6gONhfaHp8ucQM5
+IbahBion1gDqRX079RZMgeTTOe6u4yc53VqMDZazLECKWDkiDC9Qhc3uanXDSQQu
+eIemf1+840XcVKYTHOJmmWh4m9hfJqDRVytuPNVIp/HQtQSE2YwTmR5ev80Tq2Tx
+CQIDAQAB
+-----END PUBLIC KEY-----"""
+app.config['JWT_TOKEN_LOCATION'] = ['headers']
+app.config['JWT_HEADER_NAME'] = 'Authorization'
+app.config['JWT_HEADER_TYPE'] = 'Bearer'
+
+jwt = JWTManager(app)
+
+def custom_jwt_required():
+    def wrapper(fn):
+        @wraps(fn)
+        def decorator(*args, **kwargs):
+            try:
+                verify_jwt_in_request()
+            except Exception as e:
+                return jsonify({"msg": f"JWT validation failed: {str(e)}"}), 401
+            return fn(*args, **kwargs)
+        return decorator
+    return wrapper
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error_string):
+    return jsonify({
+        'status': 401,
+        'sub_status': 42,
+        'msg': f'Invalid token: {error_string}'
+    }), 401
 
 
 # Define the key points of interest
@@ -116,10 +161,12 @@ def assign_volunteers():
     return assignments
 
 @app.route('/api/volunteers', methods=['GET'])
+@custom_jwt_required()
 def get_volunteers():
     return jsonify(volunteers_df.to_dict(orient='records'))
 
 @app.route('/api/update_status', methods=['POST'])
+@custom_jwt_required()
 def update_status():
     global volunteers_df  # Ensure volunteers_df is correctly used as global
 
@@ -147,6 +194,7 @@ def update_status():
         return jsonify({'status': 'error', 'message': 'Volunteer not found.'}), 404
 
 @app.route('/api/assignments', methods=['GET'])
+@custom_jwt_required()
 def get_assignments():
     # Fully recalculate assignments on each request
     assignments = assign_volunteers()
@@ -155,6 +203,7 @@ def get_assignments():
 
 
 @app.route('/api/locations', methods=['GET'])
+@custom_jwt_required()
 def get_locations():
     # Filter volunteers to include only those who are available
     available_volunteers_df = volunteers_df[volunteers_df['available'] == True]

@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import VolunteerList from './VolunteerList';
 import Assignments from './Assignments';
 import MapPage from './MapPage';
 import Header from './Header'; 
-import axios from './axiosConfig';
+import { useKeycloak } from '@react-keycloak/web';
+import axios, { setAxiosAuth } from './axiosConfig';
 
-function App() {
+function App({ keycloak }) {
   const [volunteers, setVolunteers] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [locations, setLocations] = useState([]);
 
   useEffect(() => {
-    fetchVolunteers();
-    fetchAssignments();
-    fetchLocations();
-  }, []);
+    if (keycloak.authenticated) {
+      fetchVolunteers();
+      fetchAssignments();
+      fetchLocations();
+    }
+  }, [keycloak.authenticated]);
 
   const fetchVolunteers = async () => {
     try {
-      const response = await axios.get('/volunteers');
+      const response = await axios.get('/volunteers', {
+        headers: { Authorization: `Bearer ${keycloak.token}` }
+      });
       setVolunteers(response.data);
     } catch (error) {
       console.error('Error fetching volunteers:', error);
@@ -28,7 +33,9 @@ function App() {
 
   const fetchAssignments = async () => {
     try {
-      const response = await axios.get('/assignments');
+      const response = await axios.get('/assignments', {
+        headers: { Authorization: `Bearer ${keycloak.token}` }
+      });
       setAssignments(response.data);
     } catch (error) {
       console.error('Error fetching assignments:', error);
@@ -37,7 +44,9 @@ function App() {
 
   const fetchLocations = async () => {
     try {
-      const response = await axios.get('/locations');
+      const response = await axios.get('/locations', {
+        headers: { Authorization: `Bearer ${keycloak.token}` }
+      });
       setLocations(response.data);
     } catch (error) {
       console.error('Error fetching locations:', error);
@@ -49,6 +58,11 @@ function App() {
     fetchAssignments();
     fetchLocations();
   };
+
+  if (!keycloak.authenticated) {
+    keycloak.login();
+    return <div>Redirecting to login...</div>;
+  }
 
   const mainPageStyle = {
     display: 'flex',
@@ -74,10 +88,10 @@ function App() {
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   };
 
-  return (
+   return (
     <Router>
       <div className="App">
-        <Header /> {/* Display the header on all pages */}
+        <Header />
         <Routes>
           <Route path="/map" element={<MapPage />} />
           <Route
@@ -94,7 +108,7 @@ function App() {
                   </div>
                   <div style={sectionStyle}>
                     <h2>שכונות</h2>
-                    <Assignments assignments={[]} locations={locations} /> {/* Pass locations only */}
+                    <Assignments assignments={[]} locations={locations} />
                   </div>
                 </div>
               </div>
