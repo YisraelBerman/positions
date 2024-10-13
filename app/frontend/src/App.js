@@ -1,94 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import VolunteerList from './VolunteerList';
 import Assignments from './Assignments';
 import MapPage from './MapPage';
 import Header from './Header'; 
-import { useKeycloak } from '@react-keycloak/web';
 import axios, { setAxiosAuth } from './axiosConfig';
+import useKeycloak from './useKeycloak';
 
-function App({ keycloak }) {
+function App() {
   const [volunteers, setVolunteers] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [locations, setLocations] = useState([]);
+  const { keycloak, initialized } = useKeycloak();
 
   useEffect(() => {
-    if (keycloak.authenticated) {
-      fetchVolunteers();
-      fetchAssignments();
-      fetchLocations();
+    if (initialized && keycloak) {
+      if (keycloak.authenticated) {
+        setAxiosAuth(keycloak);
+        fetchData();
+      } else {
+        console.log('User is not authenticated, redirecting to login...');
+        keycloak.login();
+      }
     }
-  }, [keycloak.authenticated]);
+  }, [initialized, keycloak]);
 
-  const fetchVolunteers = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axios.get('/volunteers', {
-        headers: { Authorization: `Bearer ${keycloak.token}` }
-      });
-      setVolunteers(response.data);
+      const [volunteersRes, assignmentsRes, locationsRes] = await Promise.all([
+        axios.get('/volunteers'),
+        axios.get('/assignments'),
+        axios.get('/locations')
+      ]);
+      setVolunteers(volunteersRes.data);
+      setAssignments(assignmentsRes.data);
+      setLocations(locationsRes.data);
     } catch (error) {
-      console.error('Error fetching volunteers:', error);
-    }
-  };
-
-  const fetchAssignments = async () => {
-    try {
-      const response = await axios.get('/assignments', {
-        headers: { Authorization: `Bearer ${keycloak.token}` }
-      });
-      setAssignments(response.data);
-    } catch (error) {
-      console.error('Error fetching assignments:', error);
-    }
-  };
-
-  const fetchLocations = async () => {
-    try {
-      const response = await axios.get('/locations', {
-        headers: { Authorization: `Bearer ${keycloak.token}` }
-      });
-      setLocations(response.data);
-    } catch (error) {
-      console.error('Error fetching locations:', error);
+      console.error('Error fetching data:', error);
     }
   };
 
   const handleStatusChange = () => {
-    fetchVolunteers();
-    fetchAssignments();
-    fetchLocations();
+    fetchData();
   };
 
-  if (!keycloak.authenticated) {
-    keycloak.login();
-    return <div>Redirecting to login...</div>;
+  if (!initialized) {
+    return <div>Loading...</div>;
   }
 
-  const mainPageStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '20px',
-  };
+  if (!keycloak) {
+    return <div>Error initializing Keycloak. Please refresh the page or contact support.</div>;
+  }
 
-  const contentStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    width: '100%',
-    maxWidth: '1200px',
-    marginTop: '20px',
-  };
+  if (!keycloak.authenticated) {
+    return <div>You are not authenticated. Redirecting to login...</div>;
+  }
 
-  const sectionStyle = {
-    flex: '1',
-    padding: '20px',
-    border: '1px solid #ddd',
-    margin: '0 10px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-  };
-
-   return (
+  return (
     <Router>
       <div className="App">
         <Header />
@@ -119,5 +87,31 @@ function App({ keycloak }) {
     </Router>
   );
 }
+
+  const mainPageStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '20px',
+  };
+
+  const contentStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    width: '100%',
+    maxWidth: '1200px',
+    marginTop: '20px',
+  };
+
+  const sectionStyle = {
+    flex: '1',
+    padding: '20px',
+    border: '1px solid #ddd',
+    margin: '0 10px',
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+  };
+
+  
 
 export default App;

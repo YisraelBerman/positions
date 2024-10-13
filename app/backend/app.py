@@ -1,20 +1,17 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity, verify_jwt_in_request, decode_token
+from datetime import timedelta, datetime, timezone
 from jose import jwt, JWTError
 import pandas as pd
 import requests
 from functools import wraps
 
 app = Flask(__name__)
-CORS(app)
-
-# Keycloak configuration
-KEYCLOAK_URL = 'https://3.86.189.1:8443'
-REALM_NAME = 'my-app-realm'
-CLIENT_ID = 'my-app-client'
+CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
 
 # JWT configuration
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
 app.config['JWT_ALGORITHM'] = 'RS256'
 app.config['JWT_PUBLIC_KEY'] = """-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4XGntpxbcfnw5kbYPuXn
@@ -28,6 +25,7 @@ CQIDAQAB
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_HEADER_NAME'] = 'Authorization'
 app.config['JWT_HEADER_TYPE'] = 'Bearer'
+app.config['JWT_LEEWAY'] = timedelta(seconds=10)  # Add leeway for time sync issues
 
 jwt = JWTManager(app)
 
@@ -37,7 +35,25 @@ def custom_jwt_required():
         def decorator(*args, **kwargs):
             try:
                 verify_jwt_in_request()
+                token = request.headers.get('Authorization').split()[1]
+                decoded_token = decode_token(token)
+                current_time = datetime.now(timezone.utc)
+                
+                iat = datetime.fromtimestamp(decoded_token['iat'], tz=timezone.utc)
+                exp = datetime.fromtimestamp(decoded_token['exp'], tz=timezone.utc)
+                nbf = datetime.fromtimestamp(decoded_token.get('nbf', decoded_token['iat']), tz=timezone.utc)
+                
+                print(f"Current time: {current_time}")
+                print(f"Token 'iat': {iat}")
+                print(f"Token 'exp': {exp}")
+                print(f"Token 'nbf': {nbf}")
+                print(f"Time since 'iat': {current_time - iat}")
+                print(f"Time until 'exp': {exp - current_time}")
+                print(f"Time since/until 'nbf': {current_time - nbf}")
+                
+                print("JWT verified successfully")
             except Exception as e:
+                print(f"JWT validation failed: {str(e)}")
                 return jsonify({"msg": f"JWT validation failed: {str(e)}"}), 401
             return fn(*args, **kwargs)
         return decorator
@@ -45,6 +61,7 @@ def custom_jwt_required():
 
 @jwt.invalid_token_loader
 def invalid_token_callback(error_string):
+    print(f"Invalid token: {error_string}")  # New debug log
     return jsonify({
         'status': 401,
         'sub_status': 42,

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import Keycloak from 'keycloak-js';
 
 const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
@@ -12,20 +11,13 @@ export const setAxiosAuth = (keycloak) => {
     async (config) => {
       if (keycloak && keycloak.token) {
         try {
-          const isTokenValid = await keycloak.updateToken(30);
-          if (isTokenValid) {
-            config.headers.Authorization = `Bearer ${keycloak.token}`;
-          } else {
-            console.warn('Token refresh failed. Redirecting to login.');
-            keycloak.login();
-          }
+          // Always try to refresh the token before making a request
+          await keycloak.updateToken(30);
+          config.headers.Authorization = `Bearer ${keycloak.token}`;
         } catch (error) {
           console.error('Error refreshing token:', error);
           keycloak.login();
         }
-      } else {
-        console.warn('No token available. Redirecting to login.');
-        keycloak.login();
       }
       return config;
     },
@@ -34,7 +26,6 @@ export const setAxiosAuth = (keycloak) => {
     }
   );
 
-  // Add a response interceptor
   instance.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -42,10 +33,8 @@ export const setAxiosAuth = (keycloak) => {
         console.warn('Unauthorized request. Refreshing token...');
         try {
           await keycloak.updateToken(30);
-          // Retry the original request with the new token
-          const originalRequest = error.config;
-          originalRequest.headers.Authorization = `Bearer ${keycloak.token}`;
-          return axios(originalRequest);
+          error.config.headers.Authorization = `Bearer ${keycloak.token}`;
+          return axios(error.config);
         } catch (refreshError) {
           console.error('Error refreshing token:', refreshError);
           keycloak.login();
