@@ -17,49 +17,31 @@ function App() {
   const { keycloak, initialized, isAuthenticated, login } = useKeycloak();
 
   const fetchData = useCallback(async (force = false) => {
-    if (!keycloak || !keycloak.token) {
-      console.error('No token available');
-      return;
-    }
-
-    const now = Date.now();
-    if (!force && now - lastFetchTime < 60000) { // 1 minute cache
-      return;
-    }
+    if (!keycloak?.token || (!force && Date.now() - lastFetchTime < 60000)) return;
 
     setLoading(true);
     try {
-      console.log('Fetching data...');
-      
-      const config = {
-        headers: { Authorization: `Bearer ${keycloak.token}` }
-      };
-
+      const config = { headers: { Authorization: `Bearer ${keycloak.token}` } };
       const [volunteersRes, assignmentsRes, locationsRes] = await Promise.all([
         axios.get('/volunteers', config),
         axios.get('/assignments', config),
         axios.get('/locations', config)
       ]);
 
-      console.log('Data fetched successfully');
       setVolunteers(volunteersRes.data || []);
       setAssignments(assignmentsRes.data || []);
       setLocations(locationsRes.data || []);
-      setLastFetchTime(now);
+      setLastFetchTime(Date.now());
     } catch (error) {
       console.error('Error fetching data:', error);
       setVolunteers([]);
       setAssignments([]);
       setLocations([]);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, [keycloak, lastFetchTime]);
 
-  const debouncedFetchData = useMemo(
-    () => debounce(fetchData, 1000),
-    [fetchData]
-  );
+  const debouncedFetchData = useMemo(() => debounce(fetchData, 1000), [fetchData]);
 
   useEffect(() => {
     if (initialized && isAuthenticated && keycloak) {
@@ -70,17 +52,10 @@ function App() {
     }
   }, [initialized, isAuthenticated, keycloak, login, debouncedFetchData]);
 
-  const handleStatusChange = useCallback(() => {
-    fetchData(true);
-  }, [fetchData]);
+  const handleStatusChange = useCallback(() => fetchData(true), [fetchData]);
 
-  if (!initialized) {
-    return <div>Loading...</div>;
-  }
-
-  if (!isAuthenticated) {
-    return <div>Not authenticated. Please log in.</div>;
-  }
+  if (!initialized) return <div>Loading...</div>;
+  if (!isAuthenticated) return <div>Not authenticated. Please log in.</div>;
 
   return (
     <Router>
@@ -118,30 +93,28 @@ function App() {
   );
 }
 
-  const mainPageStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '20px',
-  };
+const mainPageStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  padding: '20px',
+};
 
-  const contentStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    width: '100%',
-    maxWidth: '1200px',
-    marginTop: '20px',
-  };
+const contentStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  width: '100%',
+  maxWidth: '1200px',
+  marginTop: '20px',
+};
 
-  const sectionStyle = {
-    flex: '1',
-    padding: '20px',
-    border: '1px solid #ddd',
-    margin: '0 10px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-  };
-
-  
+const sectionStyle = {
+  flex: '1',
+  padding: '20px',
+  border: '1px solid #ddd',
+  margin: '0 10px',
+  borderRadius: '8px',
+  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+};
 
 export default App;

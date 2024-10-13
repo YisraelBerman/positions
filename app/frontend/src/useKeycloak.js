@@ -12,11 +12,7 @@ const useKeycloak = () => {
   const [initialized, setInitialized] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const login = useCallback(() => {
-    if (keycloak) {
-      keycloak.login();
-    }
-  }, [keycloak]);
+  const login = useCallback(() => keycloak?.login(), [keycloak]);
 
   useEffect(() => {
     const initKeycloak = async () => {
@@ -31,30 +27,24 @@ const useKeycloak = () => {
         });
 
         keycloakInstance.onTokenExpired = () => {
-          console.log('Token expired. Refreshing...');
-          keycloakInstance.updateToken(30).then((refreshed) => {
-            if (refreshed) {
-              console.log('Token refreshed successfully');
-              setIsAuthenticated(true);
-            } else {
-              console.log('Token not refreshed. Manual login required');
+          keycloakInstance.updateToken(30)
+            .then((refreshed) => {
+              if (refreshed) {
+                setIsAuthenticated(true);
+              } else {
+                setIsAuthenticated(false);
+                login();
+              }
+            })
+            .catch(() => {
               setIsAuthenticated(false);
               login();
-            }
-          }).catch((error) => {
-            console.error('Failed to refresh token', error);
-            setIsAuthenticated(false);
-            login();
-          });
+            });
         };
 
         setKeycloak(keycloakInstance);
         setIsAuthenticated(authenticated);
         setInitialized(true);
-
-        if (!authenticated) {
-          console.warn('User is not authenticated');
-        }
       } catch (error) {
         console.error('Failed to initialize Keycloak', error);
         setInitialized(true);

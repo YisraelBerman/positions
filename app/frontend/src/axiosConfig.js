@@ -9,22 +9,14 @@ const instance = axios.create({
 export const setAxiosAuth = (keycloak) => {
   instance.interceptors.request.use(
     async (config) => {
-      if (keycloak && keycloak.token) {
-        console.log('Setting Authorization header');
+      if (keycloak?.token) {
         config.headers.Authorization = `Bearer ${keycloak.token}`;
-        console.log('Authorization header set:', config.headers.Authorization);
-      } else {
-        console.warn('No token available');
       }
       return config;
     },
-    (error) => {
-      console.error('Error in request interceptor:', error);
-      return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
   );
 
-  // Ensure the token is set for every request, even if the interceptor fails
   instance.defaults.headers.common['Authorization'] = `Bearer ${keycloak.token}`;
 };
 
