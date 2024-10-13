@@ -1,6 +1,6 @@
 id,name,location,available,closest_point
 1,ישראל,D,True,9
-2,שגיא,A,True,1
+2,שגיא,A,False,1
 3,אורי,B,True,14
 4,יעקב,D,True,12
 5,בנימין,B,True,16
@@ -24,7 +24,7 @@ id,name,location,available,closest_point
 23,דוב,A,True,22
 24,דניאל,A,False,21
 25,טמיר,C,False,3
-26,יוסף,D,True,9
+26,יוסף,D,False,9
 27,כפיר,B,False,16
 28,אולג,C,True,5
 29,בעז,B,True,17

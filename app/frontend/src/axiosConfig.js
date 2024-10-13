@@ -10,39 +10,22 @@ export const setAxiosAuth = (keycloak) => {
   instance.interceptors.request.use(
     async (config) => {
       if (keycloak && keycloak.token) {
-        try {
-          // Always try to refresh the token before making a request
-          await keycloak.updateToken(30);
-          config.headers.Authorization = `Bearer ${keycloak.token}`;
-        } catch (error) {
-          console.error('Error refreshing token:', error);
-          keycloak.login();
-        }
+        console.log('Setting Authorization header');
+        config.headers.Authorization = `Bearer ${keycloak.token}`;
+        console.log('Authorization header set:', config.headers.Authorization);
+      } else {
+        console.warn('No token available');
       }
       return config;
     },
     (error) => {
+      console.error('Error in request interceptor:', error);
       return Promise.reject(error);
     }
   );
 
-  instance.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-      if (error.response && error.response.status === 401) {
-        console.warn('Unauthorized request. Refreshing token...');
-        try {
-          await keycloak.updateToken(30);
-          error.config.headers.Authorization = `Bearer ${keycloak.token}`;
-          return axios(error.config);
-        } catch (refreshError) {
-          console.error('Error refreshing token:', refreshError);
-          keycloak.login();
-        }
-      }
-      return Promise.reject(error);
-    }
-  );
+  // Ensure the token is set for every request, even if the interceptor fails
+  instance.defaults.headers.common['Authorization'] = `Bearer ${keycloak.token}`;
 };
 
 export default instance;

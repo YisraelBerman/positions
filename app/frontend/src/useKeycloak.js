@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Keycloak from 'keycloak-js';
 
 const keycloakConfig = {
-  url:  'https://3.86.189.1:8443',
+  url: 'https://3.86.189.1:8443',
   realm: 'my-app-realm',
   clientId: 'my-app-client'
 };
@@ -10,6 +10,13 @@ const keycloakConfig = {
 const useKeycloak = () => {
   const [keycloak, setKeycloak] = useState(null);
   const [initialized, setInitialized] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const login = useCallback(() => {
+    if (keycloak) {
+      keycloak.login();
+    }
+  }, [keycloak]);
 
   useEffect(() => {
     const initKeycloak = async () => {
@@ -19,8 +26,8 @@ const useKeycloak = () => {
           onLoad: 'check-sso',
           silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
           pkceMethod: 'S256',
-          checkLoginIframe: false, // Disable iframe checking
-          promiseType: 'native' // Use native promises
+          checkLoginIframe: false,
+          promiseType: 'native'
         });
 
         keycloakInstance.onTokenExpired = () => {
@@ -28,22 +35,25 @@ const useKeycloak = () => {
           keycloakInstance.updateToken(30).then((refreshed) => {
             if (refreshed) {
               console.log('Token refreshed successfully');
+              setIsAuthenticated(true);
             } else {
               console.log('Token not refreshed. Manual login required');
-              keycloakInstance.login();
+              setIsAuthenticated(false);
+              login();
             }
           }).catch((error) => {
             console.error('Failed to refresh token', error);
-            keycloakInstance.login();
+            setIsAuthenticated(false);
+            login();
           });
         };
 
         setKeycloak(keycloakInstance);
+        setIsAuthenticated(authenticated);
         setInitialized(true);
 
         if (!authenticated) {
           console.warn('User is not authenticated');
-          keycloakInstance.login();
         }
       } catch (error) {
         console.error('Failed to initialize Keycloak', error);
@@ -52,9 +62,9 @@ const useKeycloak = () => {
     };
 
     initKeycloak();
-  }, []);
+  }, [login]);
 
-  return { keycloak, initialized };
+  return { keycloak, initialized, isAuthenticated, login };
 };
 
 export default useKeycloak;

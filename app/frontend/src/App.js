@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import VolunteerList from './VolunteerList';
 import Assignments from './Assignments';
@@ -11,49 +11,62 @@ function App() {
   const [volunteers, setVolunteers] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [locations, setLocations] = useState([]);
-  const { keycloak, initialized } = useKeycloak();
+  const { keycloak, initialized, isAuthenticated, login } = useKeycloak();
 
-  useEffect(() => {
-    if (initialized && keycloak) {
-      if (keycloak.authenticated) {
-        setAxiosAuth(keycloak);
-        fetchData();
-      } else {
-        console.log('User is not authenticated, redirecting to login...');
-        keycloak.login();
-      }
+  const fetchData = useCallback(async () => {
+    if (!keycloak || !keycloak.token) {
+      console.error('No token available');
+      return;
     }
-  }, [initialized, keycloak]);
 
-  const fetchData = async () => {
     try {
+      console.log('Fetching data...');
+      console.log('Current token:', keycloak.token);
+      
+      const config = {
+        headers: { Authorization: `Bearer ${keycloak.token}` }
+      };
+
       const [volunteersRes, assignmentsRes, locationsRes] = await Promise.all([
-        axios.get('/volunteers'),
-        axios.get('/assignments'),
-        axios.get('/locations')
+        axios.get('/volunteers', config),
+        axios.get('/assignments', config),
+        axios.get('/locations', config)
       ]);
+
+      console.log('Data fetched successfully');
       setVolunteers(volunteersRes.data);
       setAssignments(assignmentsRes.data);
       setLocations(locationsRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+      }
     }
-  };
+  }, [keycloak]);
 
-  const handleStatusChange = () => {
-    fetchData();
-  };
+  useEffect(() => {
+    if (initialized) {
+      if (isAuthenticated) {
+        console.log('User is authenticated');
+        console.log('Token available:', !!keycloak.token);
+        setAxiosAuth(keycloak);
+        fetchData();
+      } else {
+        console.log('User is not authenticated, redirecting to login...');
+        login();
+      }
+    }
+  }, [initialized, isAuthenticated, keycloak, login, fetchData]);
 
   if (!initialized) {
     return <div>Loading...</div>;
   }
 
-  if (!keycloak) {
-    return <div>Error initializing Keycloak. Please refresh the page or contact support.</div>;
-  }
-
-  if (!keycloak.authenticated) {
-    return <div>You are not authenticated. Redirecting to login...</div>;
+  if (!isAuthenticated) {
+    return <div>Not authenticated. Please log in.</div>;
   }
 
   return (
@@ -67,7 +80,7 @@ function App() {
             element={
               <div style={mainPageStyle}>
                 <div style={{ ...sectionStyle, width: '100%' }}>
-                  <VolunteerList volunteers={volunteers} onStatusChange={handleStatusChange} />
+                  <VolunteerList volunteers={volunteers} onStatusChange={fetchData} />
                 </div>
                 <div style={contentStyle}>
                   <div style={sectionStyle}>
