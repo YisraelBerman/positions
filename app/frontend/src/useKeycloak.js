@@ -7,13 +7,16 @@ const keycloakConfig = {
   clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'my-app-client'
 };
 
-// Custom UUID generation function
-function customUUID() {
-  let dt = new Date().getTime();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = (dt + Math.random()*16)%16 | 0;
-    dt = Math.floor(dt/16);
-    return (c === 'x' ? r : (r&0x3|0x8)).toString(16);
+// Robust UUID generation function
+function robustUUID() {
+  let d = new Date().getTime();
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    d += performance.now(); // use high-precision timer if available
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (d + Math.random() * 16) % 16 | 0;
+    d = Math.floor(d / 16);
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
 }
 
@@ -21,6 +24,7 @@ const useKeycloak = () => {
   const [keycloak, setKeycloak] = useState(null);
   const [initialized, setInitialized] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [error, setError] = useState(null);
 
   const login = useCallback(() => keycloak?.login(), [keycloak]);
 
@@ -28,7 +32,7 @@ const useKeycloak = () => {
     const initKeycloak = async () => {
       try {
         // Override Keycloak's UUID generation method
-        Keycloak.prototype.createUUID = customUUID;
+        Keycloak.prototype.createUUID = robustUUID;
 
         const keycloakInstance = new Keycloak(keycloakConfig);
         const authenticated = await keycloakInstance.init({
@@ -49,7 +53,8 @@ const useKeycloak = () => {
                 login();
               }
             })
-            .catch(() => {
+            .catch((refreshError) => {
+              console.error('Token refresh failed:', refreshError);
               setIsAuthenticated(false);
               login();
             });
@@ -60,6 +65,7 @@ const useKeycloak = () => {
         setInitialized(true);
       } catch (error) {
         console.error('Failed to initialize Keycloak', error);
+        setError(error);
         setInitialized(true);
       }
     };
@@ -67,7 +73,7 @@ const useKeycloak = () => {
     initKeycloak();
   }, [login]);
 
-  return { keycloak, initialized, isAuthenticated, login };
+  return { keycloak, initialized, isAuthenticated, login, error };
 };
 
 export default useKeycloak;
