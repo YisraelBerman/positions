@@ -106,7 +106,6 @@ def invalid_token_callback(error_string):
     }), 401
 
 
-
 # Define the key points of interest
 key_points_list = [1, 4, 7, 12, 16, 19, 21]
 last_point = 24

@@ -133,7 +133,7 @@ pipeline {
                         
                         if (env.BUILD_BACKEND == 'true') {
                             sh """
-                            ssh -i "$secret" ${env.SSH_TARGET} "
+                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
                                 sudo docker stop backend || true && sudo docker rm backend || true;
                                 sudo docker pull ${env.BACKEND_IMAGE};
                                 sudo docker run -d --name backend -p 5000:5000 \\
@@ -150,7 +150,7 @@ pipeline {
 
                         if (env.BUILD_FRONTEND == 'true') {
                             sh """
-                            ssh -i "$secret" ${env.SSH_TARGET} "
+                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
                                 sudo docker stop frontend || true && sudo docker rm frontend || true;
                                 sudo docker pull ${env.FRONTEND_IMAGE};
                                 sudo docker run -d --name frontend -p 3002:3002 \\
