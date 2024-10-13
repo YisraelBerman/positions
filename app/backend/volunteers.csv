@@ -2,7 +2,7 @@ id,name,location,available,closest_point
 1,ישראל,D,True,9
 2,שגיא,A,False,1
 3,אורי,B,True,14
-4,יעקב,D,True,12
+4,יעקב,D,False,12
 5,בנימין,B,True,16
 6,אור,A,False,19
 7,אריאל,A,True,21

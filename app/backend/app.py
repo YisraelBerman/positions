@@ -96,6 +96,7 @@ def custom_jwt_required():
         return decorator
     return wrapper
 
+
 @jwt.invalid_token_loader
 def invalid_token_callback(error_string):
     print(f"Invalid token: {error_string}")
