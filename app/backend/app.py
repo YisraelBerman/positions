@@ -113,7 +113,6 @@ base_volunteers_per_point = 2
 GROUP_SIZE = 3 
 
 
-
 # Load data from CSV files
 volunteers_df = pd.read_csv('volunteers.csv', encoding='utf-8')
 fence_points_df = pd.read_csv('fence_points.csv', encoding='utf-8')
