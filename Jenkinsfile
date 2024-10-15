@@ -138,7 +138,7 @@ pipeline {
                                 sudo docker pull ${env.BACKEND_IMAGE} && \
                                 sudo docker run -d --name backend -p 5000:5000 \
                                 -e FLASK_ENV=production \
-                                -e KEYCLOAK_URL=https://${env.AWS_KEYCLOAK_IP}:8443 \
+                                -e KEYCLOAK_URL=https://keycloak.yisraelberman.com \
                                 -e KEYCLOAK_REALM=my-app-realm \
                                 -e KEYCLOAK_CLIENT_ID=my-app-client \
                                 -e CORS_ORIGIN=http://${env.AWS_APPS_IP}:5000 \
