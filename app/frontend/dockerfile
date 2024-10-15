@@ -21,6 +21,9 @@ ENV REACT_APP_KEYCLOAK_REALM=my-app-realm
 ENV REACT_APP_KEYCLOAK_CLIENT_ID=my-app-client
 ENV REACT_APP_BACKEND_URL=http://localhost:5000
 
+# Build the app
+RUN npm run build
+
 # Expose the frontend port
 EXPOSE 3002
 
