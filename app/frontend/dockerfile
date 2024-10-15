@@ -11,6 +11,9 @@ COPY package*.json ./
 
 RUN npm install
 
+# Install serve globally
+RUN npm install -g serve
+
 # Copy the rest of the frontend code
 COPY . .
 
@@ -28,4 +31,4 @@ RUN npm run build
 EXPOSE 3002
 
 # Run the frontend app
-CMD ["serve", "-s", "build", "--ssl-cert", "/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem", "--ssl-key", "/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem", "-l", "3002"]
+CMD ["serve", "-s", "build", "--ssl-cert", "/etc/letsencrypt/live/your-app-domain.com/fullchain.pem", "--ssl-key", "/etc/letsencrypt/live/your-app-domain.com/privkey.pem", "--listen", "3002"]
