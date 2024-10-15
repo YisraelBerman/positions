@@ -63,7 +63,6 @@ def custom_jwt_required():
             if not auth_header:
                 print("No Authorization header found in the request")
                 return jsonify({"msg": "Missing Authorization Header"}), 401
-
             print(f"Authorization header: {auth_header}")
 
             try:

@@ -4,6 +4,7 @@ import VolunteerList from './VolunteerList';
 import Assignments from './Assignments';
 import MapPage from './MapPage';
 import Header from './Header'; 
+import Footer from './Footer';
 import axios, { setAxiosAuth } from './axiosConfig';
 import useKeycloak from './useKeycloak';
 import { debounce } from 'lodash';
