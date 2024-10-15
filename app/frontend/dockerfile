@@ -25,4 +25,4 @@ ENV REACT_APP_BACKEND_URL=http://localhost:5000
 EXPOSE 3002
 
 # Run the frontend app
-CMD ["npm", "start"]
+CMD ["serve", "-s", "build", "--ssl-cert", "/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem", "--ssl-key", "/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem", "-l", "3002"]

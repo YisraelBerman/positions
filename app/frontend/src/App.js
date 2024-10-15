@@ -8,6 +8,9 @@ import axios, { setAxiosAuth } from './axiosConfig';
 import useKeycloak from './useKeycloak';
 import { debounce } from 'lodash';
 
+const APP_VERSION = '0.1.0'; 
+const DEVELOPER_NAME = 'Yisrael Berman  058-404-6555';
+
 function App() {
   const [volunteers, setVolunteers] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -88,6 +91,7 @@ function App() {
             />
           </Routes>
         )}
+        <Footer name={DEVELOPER_NAME} version={APP_VERSION} />
       </div>
     </Router>
   );

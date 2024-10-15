@@ -155,10 +155,11 @@ pipeline {
                                 sudo docker pull ${env.FRONTEND_IMAGE};
                                 sudo docker run -d --name frontend -p 3002:3002 \\
                                 -e REACT_APP_BACKEND_URL=http://${env.AWS_APPS_IP}:5000 \\
-                                -e REACT_APP_KEYCLOAK_URL=https://${env.AWS_KEYCLOAK_IP}:8443 \\
+                                -e REACT_APP_KEYCLOAK_URL=https://keycloak.yisraelberman.com \\
                                 -e REACT_APP_KEYCLOAK_REALM=my-app-realm \\
                                 -e REACT_APP_KEYCLOAK_CLIENT_ID=my-app-client \\
-                                 -e REACT_APP_BACKEND_URL=http://${env.AWS_APPS_IP}:5000 \\
+                                -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \\
+                                -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \\
                                 ${env.FRONTEND_IMAGE};
                             "
                             """
