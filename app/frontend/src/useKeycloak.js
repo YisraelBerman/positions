@@ -29,7 +29,7 @@ const useKeycloak = () => {
         });
 
         keycloakInstance.onTokenExpired = () => {
-          keycloakInstance.updateToken(30)
+          keycloakInstance.updateToken(60)
             .then((refreshed) => {
               if (refreshed) {
                 setIsAuthenticated(true);
