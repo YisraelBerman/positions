@@ -13,13 +13,27 @@ const useKeycloak = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState(null);
 
-  const login = useCallback(() => keycloak?.login(), [keycloak]);
+  const login = useCallback(() => {
+    console.log('Attempting to log in...');
+    keycloak?.login().catch(error => {
+      console.error('Login failed:', error);
+      setError(error);
+    });
+  }, [keycloak]);
 
   useEffect(() => {
     const initKeycloak = async () => {
       try {
-        
+        console.log('Initializing Keycloak with config:', keycloakConfig);
         const keycloakInstance = new Keycloak(keycloakConfig);
+        
+        keycloakInstance.onAuthSuccess = () => console.log('Auth Success');
+        keycloakInstance.onAuthError = (error) => console.error('Auth Error:', error);
+        keycloakInstance.onAuthRefreshSuccess = () => console.log('Auth Refresh Success');
+        keycloakInstance.onAuthRefreshError = (error) => console.error('Auth Refresh Error:', error);
+        keycloakInstance.onAuthLogout = () => console.log('Auth Logout');
+        keycloakInstance.onTokenExpired = () => console.log('Token Expired');
+
         const authenticated = await keycloakInstance.init({
           onLoad: 'check-sso',
           silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
@@ -27,23 +41,7 @@ const useKeycloak = () => {
           checkLoginIframe: false,
           promiseType: 'native'
         });
-
-        keycloakInstance.onTokenExpired = () => {
-          keycloakInstance.updateToken(30)
-            .then((refreshed) => {
-              if (refreshed) {
-                setIsAuthenticated(true);
-              } else {
-                setIsAuthenticated(false);
-                login();
-              }
-            })
-            .catch((refreshError) => {
-              console.error('Token refresh failed:', refreshError);
-              setIsAuthenticated(false);
-              login();
-            });
-        };
+        console.log('Keycloak initialized, authenticated:', authenticated);
 
         setKeycloak(keycloakInstance);
         setIsAuthenticated(authenticated);
@@ -56,7 +54,7 @@ const useKeycloak = () => {
     };
 
     initKeycloak();
-  }, [login]);
+  }, []);
 
   return { keycloak, initialized, isAuthenticated, login, error };
 };
