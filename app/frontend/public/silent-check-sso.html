@@ -1,12 +1,18 @@
 <!doctype html>
-<html lang="en">
+<html>
 <head>
     <meta charset="utf-8">
     <title>Silent SSO check</title>
 </head>
 <body>
+    <script src="https://keycloak.yisraelberman.com/js/keycloak.js"></script>
     <script>
-        parent.postMessage(location.href, location.origin);
+        var keycloak = new Keycloak();
+        keycloak.init({ checkLoginIframe: false }).then(function(authenticated) {
+            window.parent.postMessage(authenticated ? 'authenticated' : 'not authenticated', '*');
+        }).catch(function() {
+            window.parent.postMessage('error', '*');
+        });
     </script>
 </body>
 </html>
