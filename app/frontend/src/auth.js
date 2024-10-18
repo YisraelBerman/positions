@@ -30,7 +30,7 @@ export const getToken = () => keycloak.token;
 export const isLoggedIn = () => !!keycloak.token;
 
 export const updateToken = (successCallback) => {
-  keycloak.updateToken(5)
+  keycloak.updateToken(30)
     .then(successCallback)
     .catch(login);
 };
