@@ -10,7 +10,7 @@ export const setAxiosAuth = (keycloak) => {
     async (config) => {
       if (keycloak?.token) {
         config.headers.Authorization = `Bearer ${keycloak.token}`;
-        console.log("Axios using updated token:", keycloak.token);
+        console.log("Axios using token:", keycloak.token);  // Log the token for debugging
       }
       return config;
     },

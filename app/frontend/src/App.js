@@ -52,16 +52,18 @@ function App() {
         // Prevent any actions until Keycloak is fully initialized
         return;
     }
-    
+
     if (initialized && !isAuthenticated) {
         console.log("Keycloak initialized but not authenticated, attempting login...");
         login();
     } else if (initialized && isAuthenticated) {
         console.log("Authenticated, fetching data...");
+        // Only set axios auth and fetch data if authenticated
         setAxiosAuth(keycloak);
         debouncedFetchData();
     }
 }, [initialized, isAuthenticated, keycloak, login, debouncedFetchData]);
+
 
 
 

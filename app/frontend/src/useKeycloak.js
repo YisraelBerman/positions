@@ -27,14 +27,20 @@ const useKeycloak = () => {
           promiseType: 'native'
         });
 
+        if (authenticated) {
+          console.log("User is authenticated");
+        } else {
+          console.log("User not authenticated, redirecting to login");
+        }
+
         keycloakInstance.onTokenExpired = () => {
           keycloakInstance.updateToken(60)
             .then((refreshed) => {
               if (refreshed) {
-                setIsAuthenticated(true);
                 console.log("Token refreshed successfully");
+                setIsAuthenticated(true);
               } else {
-                console.log("Token not refreshed, re-logging...");
+                console.log("Token not refreshed, forcing login");
                 setIsAuthenticated(false);
                 login();
               }
@@ -52,7 +58,7 @@ const useKeycloak = () => {
       } catch (error) {
         console.error('Failed to initialize Keycloak', error);
         setError(error);
-        setInitialized(true);  // Ensure we don't block the initialization state
+        setInitialized(true); // Ensure the app knows initialization completed, even on failure
       }
     };
 
