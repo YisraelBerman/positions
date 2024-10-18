@@ -14,7 +14,7 @@ const useKeycloak = () => {
   const [error, setError] = useState(null);
 
   const login = useCallback(() => {
-    console.log('Attempting to log in...');
+    console.log('Login function called');
     keycloak?.login().catch(error => {
       console.error('Login failed:', error);
       setError(error);
@@ -34,6 +34,7 @@ const useKeycloak = () => {
         keycloakInstance.onAuthLogout = () => console.log('Auth Logout');
         keycloakInstance.onTokenExpired = () => console.log('Token Expired');
 
+        console.log('Starting Keycloak init');
         const authenticated = await keycloakInstance.init({
           onLoad: 'check-sso',
           silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
@@ -41,11 +42,12 @@ const useKeycloak = () => {
           checkLoginIframe: false,
           promiseType: 'native'
         });
-        console.log('Keycloak initialized, authenticated:', authenticated);
+        console.log('Keycloak init completed. Authenticated:', authenticated);
 
         setKeycloak(keycloakInstance);
         setIsAuthenticated(authenticated);
         setInitialized(true);
+        console.log('Keycloak state updated');
       } catch (error) {
         console.error('Failed to initialize Keycloak', error);
         setError(error);
@@ -53,6 +55,7 @@ const useKeycloak = () => {
       }
     };
 
+    console.log('useEffect triggered, calling initKeycloak');
     initKeycloak();
   }, []);
 
