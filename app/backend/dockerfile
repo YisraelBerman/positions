@@ -16,7 +16,7 @@ EXPOSE 5000
 # Define environment variables with default values
 ENV FLASK_APP=app.py
 ENV FLASK_RUN_HOST=0.0.0.0
-ENV KEYCLOAK_URL=http://localhost:8443
+ENV KEYCLOAK_URL=https://keycloak.yisraelberman.com
 ENV KEYCLOAK_REALM=my-app-realm
 ENV KEYCLOAK_CLIENT_ID=your-client-id
 ENV CORS_ORIGIN=http://localhost:3000

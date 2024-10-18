@@ -141,7 +141,7 @@ pipeline {
                                 -e KEYCLOAK_URL=https://keycloak.yisraelberman.com \
                                 -e KEYCLOAK_REALM=my-app-realm \
                                 -e KEYCLOAK_CLIENT_ID=my-app-client \
-                                -e CORS_ORIGIN=http://${env.AWS_APPS_IP}:5000 \
+                                -e CORS_ORIGIN=https://${env.AWS_APPS_IP}:5000 \
                                 ${env.BACKEND_IMAGE}
                             "
                             """
@@ -154,7 +154,7 @@ pipeline {
                                 sudo docker stop frontend || true && sudo docker rm frontend || true;
                                 sudo docker pull ${env.FRONTEND_IMAGE};
                                 sudo docker run -d --name frontend -p 443:3002 \\
-                                -e REACT_APP_BACKEND_URL=http://${env.AWS_APPS_IP}:5000 \\
+                                -e REACT_APP_BACKEND_URL=https://${env.AWS_APPS_IP}:5000 \\
                                 -e REACT_APP_KEYCLOAK_URL=https://keycloak.yisraelberman.com \\
                                 -e REACT_APP_KEYCLOAK_REALM=my-app-realm \\
                                 -e REACT_APP_KEYCLOAK_CLIENT_ID=my-app-client \\
