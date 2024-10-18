@@ -18,14 +18,12 @@ function App() {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastFetchTime, setLastFetchTime] = useState(0);
-  const [error, setError] = useState(null);
-  const { keycloak, initialized, isAuthenticated, login, error: keycloakError } = useKeycloak();
+  const { keycloak, initialized, isAuthenticated, login } = useKeycloak();
 
   const fetchData = useCallback(async (force = false) => {
     if (!keycloak?.token || (!force && Date.now() - lastFetchTime < 60000)) return;
 
     setLoading(true);
-    setError(null);
     try {
       const config = { headers: { Authorization: `Bearer ${keycloak.token}` } };
       const [volunteersRes, assignmentsRes, locationsRes] = await Promise.all([
@@ -40,7 +38,6 @@ function App() {
       setLastFetchTime(Date.now());
     } catch (error) {
       console.error('Error fetching data:', error);
-      setError('Failed to fetch data. Please try again later.');
       setVolunteers([]);
       setAssignments([]);
       setLocations([]);
@@ -61,36 +58,8 @@ function App() {
 
   const handleStatusChange = useCallback(() => fetchData(true), [fetchData]);
 
-  if (!initialized) {
-    return (
-      <div>
-        <p>Initializing Keycloak...</p>
-        <p>Keycloak URL: {process.env.REACT_APP_KEYCLOAK_URL}</p>
-        <p>Realm: {process.env.REACT_APP_KEYCLOAK_REALM}</p>
-        <p>Client ID: {process.env.REACT_APP_KEYCLOAK_CLIENT_ID}</p>
-      </div>
-    );
-  }
-  
-  if (keycloakError) {
-    return (
-      <div>
-        <p>Error initializing Keycloak: {keycloakError.message}</p>
-        <button onClick={() => window.location.reload()}>Retry</button>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div>
-        <p>Not authenticated. Please log in.</p>
-        <button onClick={login}>Login</button>
-        <p>Keycloak initialized: {initialized ? 'Yes' : 'No'}</p>
-        <p>Is authenticated: {isAuthenticated ? 'Yes' : 'No'}</p>
-      </div>
-    );
-  }
+  if (!initialized) return <div>Loading...</div>;
+  if (!isAuthenticated) return <div>Not authenticated. Please log in.</div>;
 
   return (
     <Router>
@@ -98,8 +67,6 @@ function App() {
         <Header />
         {loading ? (
           <div>Loading data...</div>
-        ) : error ? (
-          <div>Error: {error}</div>
         ) : (
           <Routes>
             <Route path="/map" element={<MapPage />} />
