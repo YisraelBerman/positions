@@ -13,7 +13,7 @@ import traceback
 
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'http://localhost:3000')}})
+CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
 
 # Keycloak configuration
 KEYCLOAK_URL = os.environ.get('KEYCLOAK_URL', "https://3.86.189.1:8443")
@@ -307,6 +307,6 @@ def get_locations():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
     app.config['TIMEZONE'] = pytz.UTC
 

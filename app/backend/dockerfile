@@ -10,6 +10,9 @@ COPY . /app
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install gunicorn
+RUN pip install gunicorn
+
 # Make port 5000 available to the world outside this container
 EXPOSE 5000
 
@@ -18,8 +21,8 @@ ENV FLASK_APP=app.py
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV KEYCLOAK_URL=https://keycloak.yisraelberman.com
 ENV KEYCLOAK_REALM=my-app-realm
-ENV KEYCLOAK_CLIENT_ID=your-client-id
-ENV CORS_ORIGIN=http://localhost:3000
+ENV KEYCLOAK_CLIENT_ID=my-app-client
+ENV CORS_ORIGIN=https://app.yisraelberman.com
 
-# Run app.py when the container launches
-CMD ["flask", "run"]
+# Run gunicorn with SSL support when the container launches
+CMD ["gunicorn", "--certfile", "/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem", "--keyfile", "/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem", "-b", "0.0.0.0:5000", "app:app"]

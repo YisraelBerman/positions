@@ -124,50 +124,49 @@ pipeline {
 
         // Stop and remove existing containers and Pull new images from the correct repositories and run them
         stage('Deploy') {
-            when {
-                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
-            }
-            steps {
-                script {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
-                        
-                        if (env.BUILD_BACKEND == 'true') {
-                            sh """
-                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
-                                sudo docker stop backend || true && sudo docker rm backend || true && \
-                                sudo docker pull ${env.BACKEND_IMAGE} && \
-                                sudo docker run -d --name backend -p 5000:5000 \
-                                -e FLASK_ENV=production \
-                                -e KEYCLOAK_URL=https://keycloak.yisraelberman.com \
-                                -e KEYCLOAK_REALM=my-app-realm \
-                                -e KEYCLOAK_CLIENT_ID=my-app-client \
-                                -e CORS_ORIGIN=https://${env.AWS_APPS_IP}:5000 \
-                                ${env.BACKEND_IMAGE}
-                            "
-                            """
-                        }
-  
+        when {
+            expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
+        }
+        steps {
+            script {
+                withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
+                    
+                    if (env.BUILD_BACKEND == 'true') {
+                        sh """
+                        ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
+                            sudo docker stop backend || true && sudo docker rm backend || true && \
+                            sudo docker pull ${env.BACKEND_IMAGE} && \
+                            sudo docker run -d --name backend -p 5000:5000 \
+                            -e FLASK_ENV=production \
+                            -e KEYCLOAK_URL=https://keycloak.yisraelberman.com \
+                            -e KEYCLOAK_REALM=my-app-realm \
+                            -e KEYCLOAK_CLIENT_ID=my-app-client \
+                            -e CORS_ORIGIN=https://app.yisraelberman.com \
+                            -v /etc/letsencrypt/live/app.yisraelberman.com:/etc/letsencrypt/live/app.yisraelberman.com:ro \
+                            ${env.BACKEND_IMAGE}
+                        "
+                        """
+                    }
 
-                        if (env.BUILD_FRONTEND == 'true') {
-                            sh """
-                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
-                                sudo docker stop frontend || true && sudo docker rm frontend || true;
-                                sudo docker pull ${env.FRONTEND_IMAGE};
-                                sudo docker run -d --name frontend -p 443:3002 \\
-                                -e REACT_APP_BACKEND_URL=https://${env.AWS_APPS_IP}:5000 \\
-                                -e REACT_APP_KEYCLOAK_URL=https://keycloak.yisraelberman.com \\
-                                -e REACT_APP_KEYCLOAK_REALM=my-app-realm \\
-                                -e REACT_APP_KEYCLOAK_CLIENT_ID=my-app-client \\
-                                -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \\
-                                -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \\
-                                ${env.FRONTEND_IMAGE};
-                            "
-                            """
-                        }
-                    } 
-                }
+                    if (env.BUILD_FRONTEND == 'true') {
+                        sh """
+                        ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
+                            sudo docker stop frontend || true && sudo docker rm frontend || true;
+                            sudo docker pull ${env.FRONTEND_IMAGE};
+                            sudo docker run -d --name frontend -p 443:3002 \\
+                            -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \\
+                            -e REACT_APP_KEYCLOAK_URL=https://keycloak.yisraelberman.com \\
+                            -e REACT_APP_KEYCLOAK_REALM=my-app-realm \\
+                            -e REACT_APP_KEYCLOAK_CLIENT_ID=my-app-client \\
+                            -v /etc/letsencrypt/live/app.yisraelberman.com:/etc/letsencrypt/live/app.yisraelberman.com:ro \\
+                            ${env.FRONTEND_IMAGE};
+                        "
+                        """
+                    }
+                } 
             }
-        } // deploy
+        }
+    } // deploy
     } // stages
 
     post {
