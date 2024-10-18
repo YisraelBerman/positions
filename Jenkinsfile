@@ -131,7 +131,7 @@ pipeline {
             script {
                 withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
                     
-                    if ('true' == 'true') { //(env.BUILD_BACKEND == 'true')
+                    if (env.BUILD_BACKEND == 'true') {
                         sh """
                         ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
                             sudo docker stop backend || true && sudo docker rm backend || true && \
@@ -149,7 +149,7 @@ pipeline {
                         """
                     }
 
-                    if ('true' == 'true') { //(env.BUILD_FRONTEND == 'true')
+                    if (env.BUILD_FRONTEND == 'true') {
                         sh """
                         ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
                             sudo docker stop frontend || true && sudo docker rm frontend || true;

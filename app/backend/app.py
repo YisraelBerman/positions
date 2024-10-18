@@ -120,7 +120,6 @@ fence_points_df = pd.read_csv('fence_points.csv', encoding='utf-8')
 fence_points_df['importance'] = pd.to_numeric(fence_points_df['importance'], errors='coerce').fillna(10)
 
 
-
 def redistribute_volunteers(volunteers_df, key_points):
     assignments = []
     assigned_volunteers = set()
