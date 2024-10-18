@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Keycloak from 'keycloak-js';
 
 const keycloakConfig = {
-  url: process.env.REACT_APP_KEYCLOAK_URL || 'https://3.86.189.1:8443',
+  url: process.env.REACT_APP_KEYCLOAK_URL || 'https://keycloak.yisraelberman.com',
   realm: process.env.REACT_APP_KEYCLOAK_REALM || 'my-app-realm',
   clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'my-app-client'
 };
