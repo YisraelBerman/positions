@@ -21,10 +21,11 @@ services:
       KC_DB_PASSWORD: password
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: keycloak.yisraelberman.com
       KC_HTTPS_CERTIFICATE_FILE: /etc/x509/https/tls.crt
       KC_HTTPS_CERTIFICATE_KEY_FILE: /etc/x509/https/tls.key
     ports:
-      - "8443:8443"
+      - "443:8443"
     volumes:
       - /etc/letsencrypt/live/keycloak.yisraelberman.com/fullchain.pem:/etc/x509/https/tls.crt:ro
       - /etc/letsencrypt/live/keycloak.yisraelberman.com/privkey.pem:/etc/x509/https/tls.key:ro

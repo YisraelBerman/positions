@@ -153,7 +153,7 @@ pipeline {
                             ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
                                 sudo docker stop frontend || true && sudo docker rm frontend || true;
                                 sudo docker pull ${env.FRONTEND_IMAGE};
-                                sudo docker run -d --name frontend -p 3002:3002 \\
+                                sudo docker run -d --name frontend -p 443:3002 \\
                                 -e REACT_APP_BACKEND_URL=http://${env.AWS_APPS_IP}:5000 \\
                                 -e REACT_APP_KEYCLOAK_URL=https://keycloak.yisraelberman.com \\
                                 -e REACT_APP_KEYCLOAK_REALM=my-app-realm \\

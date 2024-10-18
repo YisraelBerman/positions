@@ -81,6 +81,7 @@ def custom_jwt_required():
 
                 if current_time < token_iat - timedelta(seconds=60):
                     raise ValueError("Token is not yet valid")
+                
                 if current_time > token_exp:
                     raise ValueError("Token has expired")
 
