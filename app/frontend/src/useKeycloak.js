@@ -18,7 +18,6 @@ const useKeycloak = () => {
   useEffect(() => {
     const initKeycloak = async () => {
       try {
-        
         const keycloakInstance = new Keycloak(keycloakConfig);
         const authenticated = await keycloakInstance.init({
           onLoad: 'check-sso',
@@ -46,7 +45,6 @@ const useKeycloak = () => {
               login();
             });
         };
-        
 
         setKeycloak(keycloakInstance);
         setIsAuthenticated(authenticated);
@@ -54,7 +52,7 @@ const useKeycloak = () => {
       } catch (error) {
         console.error('Failed to initialize Keycloak', error);
         setError(error);
-        setInitialized(true);
+        setInitialized(true);  // Ensure we don't block the initialization state
       }
     };
 

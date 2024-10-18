@@ -48,18 +48,21 @@ function App() {
   const debouncedFetchData = useMemo(() => debounce(fetchData, 1000), [fetchData]);
 
   useEffect(() => {
-    if (initialized) {
-        if (!isAuthenticated && !loading) {
-            console.log("Not authenticated, attempting login...");
-            login();
-        } else if (isAuthenticated) {
-            // If authenticated, set up axios and fetch data
-            console.log("Authenticated, fetching data...");
-            setAxiosAuth(keycloak);
-            debouncedFetchData();
-        }
+    if (!initialized) {
+        // Prevent any actions until Keycloak is fully initialized
+        return;
     }
-}, [initialized, isAuthenticated, keycloak, login, debouncedFetchData, loading]);
+    
+    if (initialized && !isAuthenticated) {
+        console.log("Keycloak initialized but not authenticated, attempting login...");
+        login();
+    } else if (initialized && isAuthenticated) {
+        console.log("Authenticated, fetching data...");
+        setAxiosAuth(keycloak);
+        debouncedFetchData();
+    }
+}, [initialized, isAuthenticated, keycloak, login, debouncedFetchData]);
+
 
 
 
