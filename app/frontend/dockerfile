@@ -20,7 +20,7 @@ COPY . .
 
 # Set environment variables
 ENV PORT=3002
-ENV REACT_APP_KEYCLOAK_URL=https://3.86.189.1:8443
+ENV REACT_APP_KEYCLOAK_URL=https://keycloak.yisraelberman.com
 ENV REACT_APP_KEYCLOAK_REALM=my-app-realm
 ENV REACT_APP_KEYCLOAK_CLIENT_ID=my-app-client
 ENV REACT_APP_BACKEND_URL=http://localhost:5000

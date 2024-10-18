@@ -7,7 +7,7 @@ pipeline {
         GITHUB_TOKEN = credentials('github-token')
         GITHUB_USER = credentials('github-user')
         AWS_APPS_IP = credentials('AWS_apps_IP') 
-        AWS_KEYCLOAK_IP = credentials('AWS_keycloak_IP') 
+        // AWS_KEYCLOAK_IP = credentials('AWS_keycloak_IP') 
 
         SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
     }
