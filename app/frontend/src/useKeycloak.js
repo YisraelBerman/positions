@@ -48,17 +48,18 @@ const useKeycloak = () => {
             .catch((refreshError) => {
               console.error('Token refresh failed:', refreshError);
               setIsAuthenticated(false);
-              login();
+              login();  // Redirect to login if the token cannot be refreshed
             });
         };
 
         setKeycloak(keycloakInstance);
         setIsAuthenticated(authenticated);
         setInitialized(true);
+
       } catch (error) {
         console.error('Failed to initialize Keycloak', error);
         setError(error);
-        setInitialized(true); // Ensure the app knows initialization completed, even on failure
+        setInitialized(true);  // Ensure the app knows initialization completed, even on failure
       }
     };
 

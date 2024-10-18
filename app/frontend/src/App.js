@@ -49,7 +49,7 @@ function App() {
 
   useEffect(() => {
     if (!initialized) {
-        // Prevent any actions until Keycloak is fully initialized
+        console.log("Keycloak not initialized yet, waiting...");
         return;
     }
 
@@ -58,13 +58,10 @@ function App() {
         login();
     } else if (initialized && isAuthenticated) {
         console.log("Authenticated, fetching data...");
-        // Only set axios auth and fetch data if authenticated
         setAxiosAuth(keycloak);
         debouncedFetchData();
     }
 }, [initialized, isAuthenticated, keycloak, login, debouncedFetchData]);
-
-
 
 
 
