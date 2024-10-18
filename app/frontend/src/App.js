@@ -49,17 +49,18 @@ function App() {
 
   useEffect(() => {
     if (initialized) {
-        // Check if initialized but not authenticated, then login
-        if (!isAuthenticated) {
+        if (!isAuthenticated && !loading) {
             console.log("Not authenticated, attempting login...");
             login();
-        } else {
+        } else if (isAuthenticated) {
             // If authenticated, set up axios and fetch data
+            console.log("Authenticated, fetching data...");
             setAxiosAuth(keycloak);
             debouncedFetchData();
         }
     }
-}, [initialized, isAuthenticated, keycloak, login, debouncedFetchData]);
+}, [initialized, isAuthenticated, keycloak, login, debouncedFetchData, loading]);
+
 
 
   const handleStatusChange = useCallback(() => fetchData(true), [fetchData]);

@@ -33,7 +33,9 @@ const useKeycloak = () => {
             .then((refreshed) => {
               if (refreshed) {
                 setIsAuthenticated(true);
+                console.log("Token refreshed successfully");
               } else {
+                console.log("Token not refreshed, re-logging...");
                 setIsAuthenticated(false);
                 login();
               }
@@ -44,6 +46,7 @@ const useKeycloak = () => {
               login();
             });
         };
+        
 
         setKeycloak(keycloakInstance);
         setIsAuthenticated(authenticated);

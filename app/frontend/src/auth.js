@@ -30,13 +30,14 @@ export const getToken = () => keycloak.token;
 export const isLoggedIn = () => !!keycloak.token;
 
 export const updateToken = (successCallback) => {
-  keycloak.updateToken(30)  // Increase timeout to 30 seconds to give more time
+  keycloak.updateToken(60)  // Increase timeout to 60 seconds to give more time
     .then(successCallback)
     .catch((error) => {
       console.error('Token update failed:', error);
-      login();  // Trigger login if the token update fails
+      keycloak.login();  // Trigger login if the token update fails
     });
 };
+
 
 
 export const getUsername = () => keycloak.tokenParsed?.preferred_username;
