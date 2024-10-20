@@ -60,7 +60,8 @@ pipeline {
                     steps {
                         script {
                             echo 'Changes detected in the frontend directory. Building frontend image...'
-                            sh "docker build --build-arg REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"                            env.BUILD_FRONTEND = 'true' 
+                            sh "docker build --build-arg REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"                            
+                            env.BUILD_FRONTEND = 'true' 
                         }
                     }
                 } // Build Frontend
