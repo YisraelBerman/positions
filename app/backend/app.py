@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity, verify_jwt_in_request, decode_token
 from datetime import timedelta, datetime, timezone
 import requests
 from functools import wraps
@@ -11,108 +10,12 @@ import os
 import pandas as pd
 import traceback
 
-
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
 
-# Keycloak configuration
-KEYCLOAK_URL = os.environ.get('KEYCLOAK_URL', "https://3.86.189.1:8443")
-KEYCLOAK_REALM = os.environ.get('KEYCLOAK_REALM', "my-app-realm")
-KEYCLOAK_CLIENT_ID = os.environ.get('KEYCLOAK_CLIENT_ID', "your-client-id")
-
-# JWT configuration
-app.config['JWT_TOKEN_LOCATION'] = ['headers']
-app.config['JWT_HEADER_NAME'] = 'Authorization'
-app.config['JWT_HEADER_TYPE'] = 'Bearer'
-app.config['JWT_ALGORITHM'] = 'RS256'
-app.config['JWT_LEEWAY'] = timedelta(hours=12)
-app.config['JWT_CLOCK_SKEW'] = timedelta(hours=12)
 app.config['TIMEZONE'] = pytz.UTC
 
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
-
-# Fetch and set the public key from Keycloak
-def get_keycloak_public_key():
-    url = f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}"
-    try:
-        response = requests.get(url, verify=False)  # Note: Use verify=True in production
-        response.raise_for_status()
-        return response.json()['public_key']
-    except requests.RequestException as e:
-        print(f"Error fetching Keycloak public key: {str(e)}")
-        return None
-
-public_key = get_keycloak_public_key()
-if public_key:
-    app.config['JWT_PUBLIC_KEY'] = f"-----BEGIN PUBLIC KEY-----\n{public_key}\n-----END PUBLIC KEY-----"
-else:
-    raise RuntimeError("Failed to fetch Keycloak public key")
-
-jwt = JWTManager(app)
-
-def custom_jwt_required():
-    def wrapper(fn):
-        @wraps(fn)
-        def decorator(*args, **kwargs):
-            print(f"Received request for {request.path}")
-            print("Request headers:")
-            for header, value in request.headers:
-                print(f"  {header}: {value}")
-            
-            auth_header = request.headers.get('Authorization')
-            if not auth_header:
-                print("No Authorization header found in the request")
-                return jsonify({"msg": "Missing Authorization Header"}), 401
-            print(f"Authorization header: {auth_header}")
-
-            try:
-                token = auth_header.split()[1]
-                decoded_token = decode_token(token)
-                
-                # Custom time check
-                current_time = datetime.now(timezone.utc)
-                token_iat = datetime.fromtimestamp(decoded_token['iat'], tz=timezone.utc)
-                token_exp = datetime.fromtimestamp(decoded_token['exp'], tz=timezone.utc)
-                
-                print(f"Token 'iat': {token_iat}")
-                print(f"Token 'exp': {token_exp}")
-                print(f"Current server time: {current_time}")
-                print(f"Time difference (iat): {current_time - token_iat}")
-
-                if current_time < token_iat - timedelta(seconds=60):
-                    raise ValueError("Token is not yet valid")
-                
-                if current_time > token_exp:
-                    raise ValueError("Token has expired")
-
-                print("JWT verified successfully")
-                print(f"Decoded token: {json.dumps(decoded_token, indent=2)}")
-            except Exception as e:
-                print(f"JWT validation failed: {str(e)}")
-                print(traceback.format_exc())
-                return jsonify({"msg": f"JWT validation failed: {str(e)}"}), 401
-            
-            return fn(*args, **kwargs)
-        return decorator
-    return wrapper
-
-@jwt.invalid_token_loader
-def invalid_token_callback(error_string):
-    print(f"Invalid token: {error_string}")
-    return jsonify({
-        'status': 401,
-        'sub_status': 42,
-        'msg': f'Invalid token: {error_string}'
-    }), 401
-
-
-# Define the key points of interest
-key_points_list = [1, 4, 7, 12, 16, 19, 21]
-last_point = 24
-base_volunteers_per_point = 2
-GROUP_SIZE = 3 
-
-
 
 # Load data from CSV files
 volunteers_df = pd.read_csv('volunteers.csv', encoding='utf-8')
@@ -214,49 +117,36 @@ def assign_volunteers():
     return assignments
 
 @app.route('/api/volunteers', methods=['GET'])
-@custom_jwt_required()
 def get_volunteers():
     return jsonify(volunteers_df.to_dict(orient='records'))
 
 @app.route('/api/update_status', methods=['POST'])
-@custom_jwt_required()
 def update_status():
-    global volunteers_df  # Ensure volunteers_df is correctly used as global
+    global volunteers_df
 
     data = request.json
     volunteer_id = data['id']
     available = data['available']
 
-    print(f"Received request to update volunteer {volunteer_id} availability to {available}")  # Debugging line
+    print(f"Received request to update volunteer {volunteer_id} availability to {available}")
 
-    # Check if the volunteer exists in the DataFrame
     if volunteer_id in volunteers_df['id'].values:
-        # Update the availability status
         volunteers_df.loc[volunteers_df['id'] == volunteer_id, 'available'] = available
-        
-        # Save changes back to CSV
         volunteers_df.to_csv('volunteers.csv', index=False)
-
-        # Reload the DataFrame if necessary to reflect updates immediately
         volunteers_df = pd.read_csv('volunteers.csv')
-
-        print("Volunteer status updated successfully.")  # Debugging line
+        print("Volunteer status updated successfully.")
         return jsonify({'status': 'success', 'message': 'Volunteer status updated.'})
     else:
-        print("Volunteer not found.")  # Debugging line
+        print("Volunteer not found.")
         return jsonify({'status': 'error', 'message': 'Volunteer not found.'}), 404
 
 @app.route('/api/assignments', methods=['GET'])
-@custom_jwt_required()
 def get_assignments():
-    # Fully recalculate assignments on each request
     assignments = assign_volunteers()
     return jsonify(assignments)
 
 
-
 @app.route('/api/locations', methods=['GET'])
-@custom_jwt_required()
 def get_locations():
     # Filter volunteers to include only those who are available
     available_volunteers_df = volunteers_df[volunteers_df['available'] == True]
@@ -308,4 +198,3 @@ def get_locations():
 if __name__ == '__main__':
     app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
     app.config['TIMEZONE'] = pytz.UTC
-

@@ -1,1 +1,0 @@
-docker run -e REACT_APP_KEYCLOAK_URL=https://new-keycloak-url:8443 -e REACT_APP_KEYCLOAK_REALM=new-realm -e REACT_APP_KEYCLOAK_CLIENT_ID=new-client -e REACT_APP_BACKEND_URL=http://new-backend-url your-image-name

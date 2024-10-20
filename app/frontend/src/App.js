@@ -5,8 +5,7 @@ import Assignments from './Assignments';
 import MapPage from './MapPage';
 import Header from './Header'; 
 import Footer from './Footer';
-import axios, { setAxiosAuth } from './axiosConfig';
-import useKeycloak from './useKeycloak';
+import axios from './axiosConfig';
 import { debounce } from 'lodash';
 
 const APP_VERSION = '0.1.0'; 
@@ -18,18 +17,16 @@ function App() {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastFetchTime, setLastFetchTime] = useState(0);
-  const { keycloak, initialized, isAuthenticated, login } = useKeycloak();
 
   const fetchData = useCallback(async (force = false) => {
-    if (!keycloak?.token || (!force && Date.now() - lastFetchTime < 60000)) return;
+    if (!force && Date.now() - lastFetchTime < 60000) return;
 
     setLoading(true);
     try {
-      const config = { headers: { Authorization: `Bearer ${keycloak.token}` } };
       const [volunteersRes, assignmentsRes, locationsRes] = await Promise.all([
-        axios.get('/volunteers', config),
-        axios.get('/assignments', config),
-        axios.get('/locations', config)
+        axios.get('/volunteers'),
+        axios.get('/assignments'),
+        axios.get('/locations')
       ]);
 
       setVolunteers(volunteersRes.data || []);
@@ -43,32 +40,15 @@ function App() {
       setLocations([]);
     }
     setLoading(false);
-  }, [keycloak, lastFetchTime]);
+  }, [lastFetchTime]);
 
   const debouncedFetchData = useMemo(() => debounce(fetchData, 1000), [fetchData]);
 
   useEffect(() => {
-    if (!initialized) {
-        console.log("Keycloak not initialized yet, waiting...");
-        return;
-    }
-
-    if (initialized && !isAuthenticated) {
-        console.log("Keycloak initialized but not authenticated, attempting login...");
-        login();
-    } else if (initialized && isAuthenticated) {
-        console.log("Authenticated, fetching data...");
-        setAxiosAuth(keycloak);
-        debouncedFetchData();
-    }
-}, [initialized, isAuthenticated, keycloak, login, debouncedFetchData]);
-
-
+    debouncedFetchData();
+  }, [debouncedFetchData]);
 
   const handleStatusChange = useCallback(() => fetchData(true), [fetchData]);
-
-  if (!initialized) return <div>Loading...</div>;
-  if (!isAuthenticated) return <div>Not authenticated. Please log in.</div>;
 
   return (
     <Router>

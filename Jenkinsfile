@@ -7,30 +7,11 @@ pipeline {
         GITHUB_TOKEN = credentials('github-token')
         GITHUB_USER = credentials('github-user')
         AWS_APPS_IP = credentials('AWS_apps_IP') 
-        // AWS_KEYCLOAK_IP = credentials('AWS_keycloak_IP') 
-
         SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
     }
 
     stages {
-        stage('Check Changes') {
-            steps {
-                script {
-                    // Get the list of changed files
-                    def changedFiles = sh(script: "git diff --name-only HEAD~1 HEAD", returnStdout: true).trim()
-                    
-                    // Check if changes are only in the keycloak directory
-                    def onlyKeycloakChanged = changedFiles.split('\n').every { it.startsWith('keycloak/') }
-                    
-                    if (onlyKeycloakChanged) {
-                        echo "Changes only in keycloak directory. Skipping pipeline execution."
-                        currentBuild.result = 'NOT_BUILT'
-                        return
-                    }
-                }
-            }
-        }
-        
+                
         stage('Initialize') {
             steps {
                 script {
@@ -139,9 +120,6 @@ pipeline {
                             sudo docker pull ${env.BACKEND_IMAGE} && \
                             sudo docker run -d --name backend -p 5000:5000 \
                             -e FLASK_ENV=production \
-                            -e KEYCLOAK_URL=https://keycloak.yisraelberman.com \
-                            -e KEYCLOAK_REALM=my-app-realm \
-                            -e KEYCLOAK_CLIENT_ID=my-app-client \
                             -e CORS_ORIGIN=https://app.yisraelberman.com \
                             -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
                             -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
@@ -157,9 +135,6 @@ pipeline {
                             sudo docker pull ${env.FRONTEND_IMAGE};
                             sudo docker run -d --name frontend -p 443:3002 \\
                             -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \\
-                            -e REACT_APP_KEYCLOAK_URL=https://keycloak.yisraelberman.com \\
-                            -e REACT_APP_KEYCLOAK_REALM=my-app-realm \\
-                            -e REACT_APP_KEYCLOAK_CLIENT_ID=my-app-client \\
                             -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \\
                             -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \\
                             ${env.FRONTEND_IMAGE};
@@ -169,8 +144,8 @@ pipeline {
                 } 
             }
         }
-    } // deploy
-    } // stages
+    } //deploy
+    } //stages
 
     post {
         always {

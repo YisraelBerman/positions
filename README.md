@@ -9,12 +9,12 @@ npm install -g eslint
 
 
 #AWS setup
-# Detailed Guide: Setting up Route 53 for React App and Keycloak
+# Detailed Guide: Setting up Route 53 for React App 
 
 ## Prerequisites
 - An AWS account
 - A registered domain name
-- EC2 instances running your React app and Keycloak server
+- EC2 instances running your React app server
 
 ## Step 1: Create a Hosted Zone in Route 53
 
@@ -37,7 +37,7 @@ npm install -g eslint
 
 Note: It may take up to 48 hours for these changes to propagate globally
 
-## Step 3: Create A Records for Your React App and Keycloak
+## Step 3: Create A Records for Your React App
 
 1. In the Route 53 console, select your hosted zone
 2. Click "Create record"
@@ -47,12 +47,7 @@ Note: It may take up to 48 hours for these changes to propagate globally
    - Value: Enter your EC2 instance's current public IP address
    - TTL (seconds): Enter 60 (or lower for quicker updates)
    - Click "Create records"
-4. Repeat for Keycloak:
-   - Name: Enter a different subdomain (e.g., "auth")
-   - Record type: Choose "A - Routes traffic to an IPv4 address and some AWS resources"
-   - Value: Enter your Keycloak EC2 instance's current public IP address
-   - TTL (seconds): Enter 60
-   - Click "Create records"
+
 
 ## Step 4: Set Up IAM Role for Route 53 Updates
 
@@ -71,7 +66,7 @@ Note: It may take up to 48 hours for these changes to propagate globally
 3. Click "Actions" > "Security" > "Modify IAM role"
 4. Select the role you created in Step 4
 5. Click "Save"
-6. Repeat for your Keycloak instance
+
 
 ## Step 6: Create a Script to Update DNS
 
@@ -82,7 +77,7 @@ Note: It may take up to 48 hours for these changes to propagate globally
 #!/bin/bash
 HOSTED_ZONE_ID="your-hosted-zone-id"
 DOMAIN_NAME="yourdomain.com"
-SUBDOMAIN="app" # Change to "auth" for Keycloak instance
+SUBDOMAIN="app" 
 
 # Get the instance's public IP
 IP=$(curl -s http://checkip.amazonaws.com)
@@ -120,7 +115,6 @@ aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --chang
    ```
    sudo chmod +x /etc/rc.local
    ```
-4. Repeat this process for both your React app and Keycloak instances
 
 ## Step 8: Set Up HTTPS
 1. Create certs
@@ -140,7 +134,7 @@ for example, add to Dockerfile:
       - /etc/letsencrypt/live/<auth.yourdomain.com>/fullchain.pem:/etc/x509/https/tls.crt:ro
       - /etc/letsencrypt/live/<auth.yourdomain.com>/privkey.pem:/etc/x509/https/tls.key:ro
 ```
-Now configure your React app and Keycloak to use these certificates. The exact process will depend on your server setup.
+Now configure your React app to use these certificates. The exact process will depend on your server setup.
 3. Configure automatic renewal
 ```
 certbot renew
@@ -150,7 +144,7 @@ certbot renew
 
 1. Restart your EC2 instances
 2. Check that the Route 53 A records have been updated with the new IP addresses
-3. Try accessing your React app and Keycloak via their respective subdomains (e.g., https://app.yourdomain.com and https://auth.yourdomain.com)
+3. Try accessing your React app via its subdomain (e.g., https://app.yourdomain.com)
 
 Remember to replace placeholders like `your-hosted-zone-id`, `yourdomain.com`, etc., with your actual values throughout this guide.
 
