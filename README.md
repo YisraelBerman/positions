@@ -153,3 +153,7 @@ certbot renew
 3. Try accessing your React app and Keycloak via their respective subdomains (e.g., https://app.yourdomain.com and https://auth.yourdomain.com)
 
 Remember to replace placeholders like `your-hosted-zone-id`, `yourdomain.com`, etc., with your actual values throughout this guide.
+
+
+
+
