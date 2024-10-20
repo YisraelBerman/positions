@@ -123,16 +123,28 @@ aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --chang
 4. Repeat this process for both your React app and Keycloak instances
 
 ## Step 8: Set Up HTTPS
-
-1. Go to the AWS Certificate Manager console
-2. Click "Request a certificate"
-3. Choose "Request a public certificate" and click "Next"
-4. Enter your domain names (e.g., app.yourdomain.com and auth.yourdomain.com)
-5. Choose "DNS validation" and click "Request"
-6. Follow the prompts to validate your domain ownership (this usually involves creating CNAME records in Route 53)
-7. Once validated, note the ARN of your certificate
-
+1. Create certs
+```
+sudo apt-get update
+sudo apt-get install certbot
+sudo certbot certonly --standalone -d <auth.yourdomain.com>
+sudo cat /etc/letsencrypt/live/<auth.yourdomain.com>/fullchain.pem \
+    /etc/letsencrypt/live/<auth.yourdomain.com>/privkey.pem > </path/to/app-cert>.pem
+sudo chown root:docker </path/to/app-cert>.pem
+sudo chmod 640 </path/to/app-cert>.pem
+```
+2. Add the certs
+for example, add to Dockerfile:
+```
+   volumes:
+      - /etc/letsencrypt/live/<auth.yourdomain.com>/fullchain.pem:/etc/x509/https/tls.crt:ro
+      - /etc/letsencrypt/live/<auth.yourdomain.com>/privkey.pem:/etc/x509/https/tls.key:ro
+```
 Now configure your React app and Keycloak to use these certificates. The exact process will depend on your server setup.
+3. Configure automatic renewal
+```
+certbot renew
+```
 
 ## Step 9: Test Your Setup
 
