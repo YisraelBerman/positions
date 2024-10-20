@@ -17,6 +17,12 @@ app.config['TIMEZONE'] = pytz.UTC
 
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
+# Define the key points of interest
+key_points_list = [1, 4, 7, 12, 16, 19, 21]
+last_point = 24
+base_volunteers_per_point = 2
+GROUP_SIZE = 3 
+
 # Load data from CSV files
 volunteers_df = pd.read_csv('volunteers.csv', encoding='utf-8')
 fence_points_df = pd.read_csv('fence_points.csv', encoding='utf-8')
