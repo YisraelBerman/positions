@@ -10,8 +10,7 @@ pipeline {
         SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
     }
 
-    stages {
-                
+    stages {         
         stage('Initialize') {
             steps {
                 script {
