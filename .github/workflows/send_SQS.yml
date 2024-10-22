@@ -1,11 +1,11 @@
 name: SQS Trigger
-
 on:
   push:
-    branches: [ master ]
+    branches:
+      - '**'
   pull_request:
-    branches: [ master ]
-
+    branches:
+      - '**'
 jobs:
   send-to-sqs:
     runs-on: ubuntu-latest
@@ -17,15 +17,23 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1  # Replace with your AWS region
+        aws-region: us-east-1
     
     - name: Send message to SQS
       run: |
+        # For pull requests, use the head branch name
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          BRANCH="${{ github.head_ref }}"
+        else
+          # For pushes, extract branch name from ref
+          BRANCH="${GITHUB_REF#refs/heads/}"
+        fi
+        
         aws sqs send-message \
           --queue-url ${{ secrets.SQS_QUEUE_URL }} \
           --message-body '{
             "project": "${{ github.repository }}",
             "commit_message": "${{ github.event.head_commit.message }}",
             "event_type": "${{ github.event_name }}",
-            "branch": "${{ github.ref }}"
+            "branch": "'"$BRANCH"'"
           }'

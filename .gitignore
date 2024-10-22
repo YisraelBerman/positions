@@ -44,9 +44,9 @@
 !/app/frontend/src/*.html
 !/app/frontend/src/*.css
 
-# allow Keycloak files
-!/app/keycloak/
-!/app/keycloak/docker-compose.yml
+# # allow Keycloak files
+# !/app/keycloak/
+# !/app/keycloak/docker-compose.yml
 
 
 # Exclude common files and directories that should remain ignored
