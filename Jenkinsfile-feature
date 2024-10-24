@@ -45,15 +45,18 @@ pipeline {
         stage('Check for Changes') {
             steps {
                 script {
-                    env.BACKEND_CHANGED = sh(
+                    def backendChanges = sh(
                         script: 'git diff --name-only HEAD~1..HEAD | grep "app/backend/" || true',
-                        returnStatus: true
-                    ) == 0 ? 'true' : 'false'
+                        returnStdout: true
+                    ).trim()
 
-                    env.FRONTEND_CHANGED = sh(
+                    def frontendChanges = sh(
                         script: 'git diff --name-only HEAD~1..HEAD | grep "app/frontend/" || true',
-                        returnStatus: true
-                    ) == 0 ? 'true' : 'false'
+                        returnStdout: true
+                    ).trim()
+
+                    env.BACKEND_CHANGED = backendChanges ? 'true' : 'false'
+                    env.FRONTEND_CHANGED = frontendChanges ? 'true' : 'false'
 
                     echo "Backend Changed: ${env.BACKEND_CHANGED}"
                     echo "Frontend Changed: ${env.FRONTEND_CHANGED}"
