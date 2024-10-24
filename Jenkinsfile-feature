@@ -22,11 +22,11 @@ pipeline {
                     env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
                     
                     // Get repository name from git remote URL
-                    env.REPO_PATH = sh(script: 'git remote get-url origin | sed "s/.*github.com[\\/:]\\(.*\\)\\.git/\\1/" | tr "[:upper:]" "[:lower:]"', returnStdout: true).trim()
-                                        
+                    env.REPO_PATH = "ghcr.io/yisraelberman/positions"
+
                     // Define image names with repository path
-                    env.BACKEND_IMAGE = "ghcr.io/${env.REPO_PATH}/backend:build-${BUILD_NUMBER}"
-                    env.FRONTEND_IMAGE = "ghcr.io/${env.REPO_PATH}/frontend:build-${BUILD_NUMBER}"
+                    env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:build-${BUILD_NUMBER}"
+                    env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:build-${BUILD_NUMBER}"
                     
                     
                     // Initialize flags
@@ -112,9 +112,9 @@ pipeline {
                         script {
                             echo 'Pushing backend image to GitHub...'
                             sh """
-                                docker tag ${env.BACKEND_IMAGE} ghcr.io/${env.REPO_PATH}/backend:latest
+                                docker tag ${env.BACKEND_IMAGE}${env.REPO_PATH}/backend:latest
                                 docker push ${env.BACKEND_IMAGE}
-                                docker push ghcr.io/${env.REPO_PATH}/backend:latest
+                                docker push ${env.REPO_PATH}/backend:latest
                             """
                         }
                     }
@@ -127,9 +127,9 @@ pipeline {
                         script {
                             echo 'Pushing frontend image to GitHub...'
                             sh """
-                                docker tag ${env.FRONTEND_IMAGE} ghcr.io/${env.REPO_PATH}/frontend:latest
+                                docker tag ${env.FRONTEND_IMAGE} ${env.REPO_PATH}/frontend:latest
                                 docker push ${env.FRONTEND_IMAGE}
-                                docker push ghcr.io/${env.REPO_PATH}/frontend:latest
+                                docker push ${env.REPO_PATH}/frontend:latest
                             """
                         }
                     }
