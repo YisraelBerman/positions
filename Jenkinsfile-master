@@ -21,8 +21,8 @@ pipeline {
                     env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
                     
                     // Get repository name from git remote URL
-                    env.REPO_PATH = sh(script: 'git remote get-url origin | sed "s/.*github.com[\\/:]\\(.*\\)\\.git/\\1/"', returnStdout: true).trim()
-                    
+                    env.REPO_PATH = sh(script: 'git remote get-url origin | sed "s/.*github.com[\\/:]\\(.*\\)\\.git/\\1/" | tr "[:upper:]" "[:lower:]"', returnStdout: true).trim()
+                                        
                     // Define image names with repository path
                     env.BACKEND_IMAGE = "ghcr.io/${env.REPO_PATH}/backend:${env.SHORT_COMMIT}"
                     env.FRONTEND_IMAGE = "ghcr.io/${env.REPO_PATH}/frontend:${env.SHORT_COMMIT}"
@@ -41,12 +41,31 @@ pipeline {
                 echo 'To be added someday.'
             }
         } // test
+        stage('Check for Changes') {
+            steps {
+                script {
+                    env.BACKEND_CHANGED = sh(
+                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/backend/" || true',
+                        returnStatus: true
+                    ) == 0 ? 'true' : 'false'
 
+                    env.FRONTEND_CHANGED = sh(
+                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/frontend/" || true',
+                        returnStatus: true
+                    ) == 0 ? 'true' : 'false'
+
+                    echo "Backend Changed: ${env.BACKEND_CHANGED}"
+                    echo "Frontend Changed: ${env.FRONTEND_CHANGED}"
+                }
+            }
+        } //Check for Changes
         stage('Build') {
             parallel {
                 stage('Build Backend') {
                     when {
-                        changeset "app/backend/**"
+                        expression {
+                            return env.BACKEND_CHANGED == 'true'
+                        }
                     }
                     steps {
                         script {
@@ -58,7 +77,9 @@ pipeline {
                 } // Build Backend
                 stage('Build Frontend') {
                     when {
-                        changeset "app/frontend/**"
+                        expression {
+                            return env.FRONTEND_CHANGED == 'true'
+                        }
                     }
                     steps {
                         script {
