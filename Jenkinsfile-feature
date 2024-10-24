@@ -11,12 +11,7 @@ pipeline {
     }
 
     stages {         
-        stage('Checkout Code') {
-            steps {
-                checkout([$class: 'GitSCM', branches: [[name: env.BRANCH_NAME]],
-                    userRemoteConfigs: [[url: 'https://github.com/YisraelBerman/positions.git', credentialsId: 'github']]])
-            }
-        }
+        
         stage('Initialize') {
             steps {
                 script {
