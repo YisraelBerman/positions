@@ -2,7 +2,7 @@
 /**
 
 # Allow specific pipeline files
-!/Jenkinsfile
+!/Jenkinsfile*
 !/.github
 !/.github/workflows
 !/.github/workflows/trigger_jenkins_mail.yml
