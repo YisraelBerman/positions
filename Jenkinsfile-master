@@ -20,9 +20,15 @@ pipeline {
                     // Extract the short commit hash
                     env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
                     
-                    // Define image names with commit tags
-                    env.BACKEND_IMAGE = "ghcr.io/yisraelberman/positions-backend:${env.SHORT_COMMIT}"
-                    env.FRONTEND_IMAGE = "ghcr.io/yisraelberman/positions-frontend:${env.SHORT_COMMIT}"
+                    // Get repository name from git remote URL
+                    env.REPO_PATH = sh(script: '''
+                        git remote get-url origin | sed 's/.*github.com[:\/]\\(.*\\)\\.git/\\1/'
+                    ''', returnStdout: true).trim()
+                    
+                    // Define image names with repository path
+                    env.BACKEND_IMAGE = "ghcr.io/${env.REPO_PATH}/backend:${env.SHORT_COMMIT}"
+                    env.FRONTEND_IMAGE = "ghcr.io/${env.REPO_PATH}/frontend:${env.SHORT_COMMIT}"
+                    
                     
                     // Initialize flags
                     env.BUILD_BACKEND = 'false'
