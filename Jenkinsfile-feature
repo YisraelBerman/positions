@@ -2,6 +2,10 @@ pipeline {
     agent {
         label 'agent1'
     }
+    parameters {
+        booleanParam(name: 'backendChanged', defaultValue: false, description: 'Were there changes in the backend?')
+        booleanParam(name: 'frontendChanged', defaultValue: false, description: 'Were there changes in the frontend?')
+    }
 
     environment {
         GITHUB_TOKEN = credentials('github-token')
@@ -47,7 +51,9 @@ pipeline {
             parallel {
                 stage('Build Backend') {
                     when {
-                        changeset "app/backend/**"
+                        expression {
+                            return params.backendChanged
+                        }
                     }
                     steps {
                         script {
@@ -59,7 +65,9 @@ pipeline {
                 } // Build Backend
                 stage('Build Frontend') {
                     when {
-                        changeset "app/frontend/**"
+                        expression {
+                            return params.frontendChanged
+                        }
                     }
                     steps {
                         script {
