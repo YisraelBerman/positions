@@ -2,10 +2,6 @@ pipeline {
     agent {
         label 'agent1'
     }
-    parameters {
-        booleanParam(name: 'backendChanged', defaultValue: false, description: 'Were there changes in the backend?')
-        booleanParam(name: 'frontendChanged', defaultValue: false, description: 'Were there changes in the frontend?')
-    }
 
     environment {
         GITHUB_TOKEN = credentials('github-token')
@@ -46,13 +42,30 @@ pipeline {
                 echo 'To be added someday.'
             }
         } // test
+        stage('Check for Changes') {
+            steps {
+                script {
+                    env.BACKEND_CHANGED = sh(
+                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/backend/" || true',
+                        returnStatus: true
+                    ) == 0 ? 'true' : 'false'
 
+                    env.FRONTEND_CHANGED = sh(
+                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/frontend/" || true',
+                        returnStatus: true
+                    ) == 0 ? 'true' : 'false'
+
+                    echo "Backend Changed: ${env.BACKEND_CHANGED}"
+                    echo "Frontend Changed: ${env.FRONTEND_CHANGED}"
+                }
+            }
+        } //Check for Changes
         stage('Build') {
             parallel {
                 stage('Build Backend') {
                     when {
                         expression {
-                            return params.backendChanged
+                            return env.BACKEND_CHANGED == 'true'
                         }
                     }
                     steps {
@@ -66,7 +79,7 @@ pipeline {
                 stage('Build Frontend') {
                     when {
                         expression {
-                            return params.frontendChanged
+                            return env.FRONTEND_CHANGED == 'true'
                         }
                     }
                     steps {
