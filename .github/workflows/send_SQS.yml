@@ -25,8 +25,9 @@ jobs:
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           BRANCH="${{ github.head_ref }}"
         else
-          # For pushes, extract branch name from ref
+          # For pushes, extract branch name from ref and decode URL encoding
           BRANCH="${GITHUB_REF#refs/heads/}"
+          BRANCH=$(echo "$BRANCH" | sed 's/%2F/\//g')  # Replace %2F with /
         fi
         
         aws sqs send-message \
