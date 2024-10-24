@@ -201,7 +201,6 @@ def get_locations():
     return jsonify(locations)
 
 
-
 if __name__ == '__main__':
     app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
     app.config['TIMEZONE'] = pytz.UTC
