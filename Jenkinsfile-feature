@@ -25,8 +25,8 @@ pipeline {
                     env.REPO_PATH = "ghcr.io/yisraelberman/positions"
 
                     // Define image names with repository path
-                    env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:build-${BUILD_NUMBER}"
-                    env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:build-${BUILD_NUMBER}"
+                    env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:${BRANCH_NAME}-build-${BUILD_NUMBER}"
+                    env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${BRANCH_NAME}-build-${BUILD_NUMBER}"
                     
                     
                     // Initialize flags
