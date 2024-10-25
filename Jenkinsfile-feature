@@ -115,9 +115,7 @@ pipeline {
                         script {
                             echo 'Pushing backend image to GitHub...'
                             sh """
-                                docker tag ${env.BACKEND_IMAGE}${env.REPO_PATH}/backend:latest
                                 docker push ${env.BACKEND_IMAGE}
-                                docker push ${env.REPO_PATH}/backend:latest
                             """
                         }
                     }
@@ -130,9 +128,7 @@ pipeline {
                         script {
                             echo 'Pushing frontend image to GitHub...'
                             sh """
-                                docker tag ${env.FRONTEND_IMAGE} ${env.REPO_PATH}/frontend:latest
                                 docker push ${env.FRONTEND_IMAGE}
-                                docker push ${env.REPO_PATH}/frontend:latest
                             """
                         }
                     }
