@@ -52,7 +52,7 @@ pipeline {
         stage('Start AWS EC2 Instance') {
             steps {
                 script {
-                    withCredentials([string(credentialsId: 'aws-instance-id', variable: 'INSTANCE_ID')]) {
+                    withCredentials([string(credentialsId: 'dev-instance-ID', variable: 'INSTANCE_ID')]) {
                         // Start the instance if not already running
                         def instanceState = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].State.Name' --output text --region $AWS_REGION", returnStdout: true).trim()
                         
