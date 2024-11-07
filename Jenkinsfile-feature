@@ -113,13 +113,12 @@ pipeline {
                                 }
                             }
                         }
-                    }
 
-                    // Run on_start.sh if the instance was just started
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} 'bash ~/on_start.sh'
-                    '''
-                        
+                        // Run on_start.sh after SSH is confirmed available
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} 'bash ~/on_start.sh'
+                        '''
+                                
                     
                 }
             }
