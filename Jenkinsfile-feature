@@ -52,24 +52,39 @@ pipeline {
         stage('Start AWS EC2 Instance') {
             steps {
                 script {
-                    withCredentials([string(credentialsId: 'dev-instance-ID', variable: 'INSTANCE_ID')]) {
-                        // Start the instance if not already running
+                    def instanceWasStarted = false  // Flag to track if the instance was started by this pipeline
+                    
+                    withCredentials([string(credentialsId: 'aws-instance-id', variable: 'INSTANCE_ID')]) {
+                        echo "Checking if instance $INSTANCE_ID is running..."
+                        
+                        // Check the instance state without exposing secrets directly in the command
                         def instanceState = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].State.Name' --output text --region $AWS_REGION", returnStdout: true).trim()
+                        echo "Instance state: $instanceState"
                         
                         if (instanceState != 'running') {
+                            instanceWasStarted = true  // Set the flag to true since we are starting the instance
+                            echo "Starting instance $INSTANCE_ID..."
                             sh "aws ec2 start-instances --instance-ids $INSTANCE_ID --region $AWS_REGION"
+                            
+                            echo "Waiting for instance $INSTANCE_ID to be in 'running' state..."
                             sh "aws ec2 wait instance-running --instance-ids $INSTANCE_ID --region $AWS_REGION"
                         }
                         
+                        echo "Retrieving public IP for instance $INSTANCE_ID..."
                         env.AWS_APPS_IP = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region $AWS_REGION", returnStdout: true).trim()
                         env.SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
                     }
 
-                    // Ensure the on_start.sh script is uploaded to the instance and run it
-                    withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
-                        sh """
-                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} 'bash ~/on_start.sh'
-                        """
+                    // Only run on_start.sh if the instance was just started
+                    if (instanceWasStarted) {
+                        echo "Running on_start.sh on the instance because it was started by this pipeline..."
+                        withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
+                            sh '''
+                                ssh -o StrictHostKeyChecking=no -i "$secret" ${SSH_TARGET} 'bash ~/on_start.sh'
+                            '''
+                        }
+                    } else {
+                        echo "Instance was already running; skipping on_start.sh."
                     }
                 }
             }
