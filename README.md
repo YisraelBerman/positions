@@ -72,7 +72,8 @@ Note: It may take up to 48 hours for these changes to propagate globally
 ## Step 6: Create a Script to Update DNS
 
 1. SSH into your EC2 instance
-2. Create a new file (e.g., `update_route53.sh`) with the following content:
+2. Install AWS CLI
+3. Create a new file (e.g., `update_route53.sh`) with the following content:
 
 ```bash
 #!/bin/bash
