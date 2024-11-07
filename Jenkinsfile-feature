@@ -96,24 +96,29 @@ pipeline {
                     }
 
                     // Wait for SSH to be available by testing an SSH connection in a loop
-                    timeout(time: 2, unit: 'MINUTES') {
-                        waitUntil {
-                            script {
-                                def sshReady = sh(script: "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i \"$secret\" ${env.SSH_TARGET} 'echo SSH is ready'", returnStatus: true) == 0
-                                if (!sshReady) {
-                                    echo "Waiting for SSH to become available on ${env.AWS_APPS_IP}..."
+                    withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'SSH_KEY_PATH')]) {
+                        timeout(time: 2, unit: 'MINUTES') {
+                            waitUntil {
+                                script {
+                                    echo "Attempting SSH connection to ${env.SSH_TARGET}..."
+                                    def sshReady = sh(script: "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i \"$SSH_KEY_PATH\" ${env.SSH_TARGET} 'echo SSH is ready'", returnStatus: true)
+                                    
+                                    if (sshReady == 0) {
+                                        echo "SSH connection successful."
+                                        return true
+                                    } else {
+                                        echo "SSH connection attempt failed. Retrying..."
+                                        return false
+                                    }
                                 }
-                                return sshReady
                             }
                         }
                     }
 
                     // Run on_start.sh if the instance was just started
-                    withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
-                        withEnv(["SSH_KEY_PATH=$secret"]) {
-                            sh '''
-                                ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} 'bash ~/on_start.sh'
-                            '''
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} 'bash ~/on_start.sh'
+                    '''
                         }
                     }
                 }
