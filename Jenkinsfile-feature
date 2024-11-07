@@ -119,8 +119,8 @@ pipeline {
                     sh '''
                         ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} 'bash ~/on_start.sh'
                     '''
-                        }
-                    }
+                        
+                    
                 }
             }
         } //Start AWS EC2 Instance       
