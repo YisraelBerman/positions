@@ -53,12 +53,18 @@ pipeline {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'dev-instance-ID', variable: 'INSTANCE_ID')]) {
-                        // Check if the instance is running
-                        env.INSTANCE_STATE = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].State.Name' --output text --region $AWS_REGION", returnStdout: true).trim()
+                        // Check instance state and set environment variable
+                        env.INSTANCE_STATE = sh(script: '''
+                            aws ec2 describe-instances --instance-ids ${INSTANCE_ID} \
+                            --query 'Reservations[*].Instances[*].State.Name' --output text --region ${AWS_REGION}
+                        ''', returnStdout: true).trim()
                         echo "Instance state: ${env.INSTANCE_STATE}"
 
                         // Retrieve and set the instance public IP
-                        env.AWS_APPS_IP = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region $AWS_REGION", returnStdout: true).trim()
+                        env.AWS_APPS_IP = sh(script: '''
+                            aws ec2 describe-instances --instance-ids ${INSTANCE_ID} \
+                            --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region ${AWS_REGION}
+                        ''', returnStdout: true).trim()
                         env.SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
                         echo "Instance public IP: ${env.AWS_APPS_IP}"
                     }
@@ -73,19 +79,36 @@ pipeline {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'dev-instance-ID', variable: 'INSTANCE_ID')]) {
-                        // Start the instance if it is not running
-                        echo "Starting instance $INSTANCE_ID..."
-                        sh "aws ec2 start-instances --instance-ids $INSTANCE_ID --region $AWS_REGION"
-                        sh "aws ec2 wait instance-running --instance-ids $INSTANCE_ID --region $AWS_REGION"
-                        echo "Instance $INSTANCE_ID is now running."
+                        echo "Starting instance..."
+                        sh '''
+                            aws ec2 start-instances --instance-ids ${INSTANCE_ID} --region ${AWS_REGION}
+                            aws ec2 wait instance-running --instance-ids ${INSTANCE_ID} --region ${AWS_REGION}
+                        '''
+                        echo "Instance is now running."
 
-                        // Retrieve and set the instance public IP again to ensure consistency
-                        env.AWS_APPS_IP = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region $AWS_REGION", returnStdout: true).trim()
+                        // Retrieve and set the public IP
+                        env.AWS_APPS_IP = sh(script: '''
+                            aws ec2 describe-instances --instance-ids ${INSTANCE_ID} \
+                            --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region ${AWS_REGION}
+                        ''', returnStdout: true).trim()
                         env.SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
                         echo "Instance public IP: ${env.AWS_APPS_IP}"
                     }
 
-                    // Run on_start.sh only if the instance was just started
+                    // Wait for SSH port 22 to be open
+                    timeout(time: 2, unit: 'MINUTES') {
+                        waitUntil {
+                            script {
+                                def portOpen = sh(script: "nc -zv ${env.AWS_APPS_IP} 22 > /dev/null 2>&1", returnStatus: true) == 0
+                                if (!portOpen) {
+                                    echo "Waiting for SSH to become available on ${env.AWS_APPS_IP}..."
+                                }
+                                return portOpen
+                            }
+                        }
+                    }
+
+                    // Run on_start.sh if the instance was just started
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
                         withEnv(["SSH_KEY_PATH=$secret"]) {
                             sh '''
