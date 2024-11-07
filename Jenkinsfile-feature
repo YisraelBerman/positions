@@ -59,20 +59,19 @@ pipeline {
                         if (instanceState != 'running') {
                             sh "aws ec2 start-instances --instance-ids $INSTANCE_ID --region $AWS_REGION"
                             sh "aws ec2 wait instance-running --instance-ids $INSTANCE_ID --region $AWS_REGION"
-                            instanceWasStarted = true
+                            withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
+                                sh """
+                                    ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} 'bash ~/on_start.sh'
+                                """
+                    }
                         }
                         
                         env.AWS_APPS_IP = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region $AWS_REGION", returnStdout: true).trim()
                         env.SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
                     }
 
-                    if (instanceWasStarted) {
-                        withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
-                            sh """
-                                ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} 'bash ~/on_start.sh'
-                            """
-                        }
-                    }
+                    
+                    
                 }
             }
         } //Start AWS EC2 Instance       
