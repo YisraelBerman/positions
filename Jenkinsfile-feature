@@ -52,20 +52,23 @@ pipeline {
         stage('Start AWS EC2 Instance') {
             steps {
                 script {
-                    def instanceState = sh(script: "aws ec2 describe-instances --instance-ids ${env.AWS_INSTANCE_ID} --query 'Reservations[*].Instances[*].State.Name' --output text --region ${env.AWS_REGION}", returnStdout: true).trim()
-                    
-                    if (instanceState != 'running') {
-                        sh "aws ec2 start-instances --instance-ids ${env.AWS_INSTANCE_ID} --region ${env.AWS_REGION}"
-                        sh "aws ec2 wait instance-running --instance-ids ${env.AWS_INSTANCE_ID} --region ${env.AWS_REGION}"
+                    withCredentials([string(credentialsId: 'aws-instance-id', variable: 'INSTANCE_ID')]) {
+                        // Start the instance if not already running
+                        def instanceState = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].State.Name' --output text --region $AWS_REGION", returnStdout: true).trim()
+                        
+                        if (instanceState != 'running') {
+                            sh "aws ec2 start-instances --instance-ids $INSTANCE_ID --region $AWS_REGION"
+                            sh "aws ec2 wait instance-running --instance-ids $INSTANCE_ID --region $AWS_REGION"
+                        }
+                        
+                        env.AWS_APPS_IP = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region $AWS_REGION", returnStdout: true).trim()
+                        env.SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
                     }
-                    
-                    env.AWS_APPS_IP = sh(script: "aws ec2 describe-instances --instance-ids ${env.AWS_INSTANCE_ID} --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region ${env.AWS_REGION}", returnStdout: true).trim()
-                    env.SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
 
-                    // Run the on_start.sh script on the instance
+                    // Ensure the on_start.sh script is uploaded to the instance and run it
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
                         sh """
-                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "bash -s" < ~/on_start.sh
+                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} 'bash ~/on_start.sh'
                         """
                     }
                 }
