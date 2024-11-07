@@ -56,6 +56,11 @@ pipeline {
                         // Check if the instance is running
                         env.INSTANCE_STATE = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].State.Name' --output text --region $AWS_REGION", returnStdout: true).trim()
                         echo "Instance state: ${env.INSTANCE_STATE}"
+
+                        // Retrieve and set the instance public IP
+                        env.AWS_APPS_IP = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region $AWS_REGION", returnStdout: true).trim()
+                        env.SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
+                        echo "Instance public IP: ${env.AWS_APPS_IP}"
                     }
                 }
             }
@@ -73,14 +78,14 @@ pipeline {
                         sh "aws ec2 start-instances --instance-ids $INSTANCE_ID --region $AWS_REGION"
                         sh "aws ec2 wait instance-running --instance-ids $INSTANCE_ID --region $AWS_REGION"
                         echo "Instance $INSTANCE_ID is now running."
-                        
-                        // Retrieve the public IP of the instance
+
+                        // Retrieve and set the instance public IP again to ensure consistency
                         env.AWS_APPS_IP = sh(script: "aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region $AWS_REGION", returnStdout: true).trim()
                         env.SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
                         echo "Instance public IP: ${env.AWS_APPS_IP}"
                     }
 
-                    // Use withEnv to avoid secret warnings
+                    // Run on_start.sh only if the instance was just started
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
                         withEnv(["SSH_KEY_PATH=$secret"]) {
                             sh '''
@@ -219,45 +224,50 @@ pipeline {
 
         // Stop and remove existing containers and Pull new images from the correct repositories and run them
         stage('Deploy') {
-        when {
-            expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
-        }
-        steps {
-            script {
-                withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
-                    
-                    if (env.BUILD_BACKEND == 'true') {
-                        sh """
-                        ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
-                            sudo docker stop backend || true && sudo docker rm backend || true && \
-                            sudo docker pull ${env.BACKEND_IMAGE} && \
-                            sudo docker run -d --name backend -p 5000:5000 \
-                            -e FLASK_ENV=production \
-                            -e CORS_ORIGIN=https://app.yisraelberman.com \
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
-                            ${env.BACKEND_IMAGE}
-                        "
-                        """
-                    }
-
-                    if (env.BUILD_FRONTEND == 'true') {
-                        sh """
-                        ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
-                            sudo docker stop frontend || true && sudo docker rm frontend || true;
-                            sudo docker pull ${env.FRONTEND_IMAGE};
-                            sudo docker run -d --name frontend -p 443:3002 \\
-                            -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \\
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \\
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \\
-                            ${env.FRONTEND_IMAGE};
-                        "
-                        """
-                    }
-                } 
+            when {
+                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
             }
-        }
-    } //deploy
+            steps {
+                script {
+                    withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
+                        withEnv(["SSH_KEY_PATH=$secret"]) {
+                            
+                            if (env.BUILD_BACKEND == 'true') {
+                                echo "Deploying backend..."
+                                sh '''
+                                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} "
+                                        sudo docker stop backend || true && sudo docker rm backend || true && \
+                                        sudo docker pull ${BACKEND_IMAGE} && \
+                                        sudo docker run -d --name backend -p 5000:5000 \
+                                        -e FLASK_ENV=production \
+                                        -e CORS_ORIGIN=https://app.yisraelberman.com \
+                                        -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
+                                        -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
+                                        ${BACKEND_IMAGE}
+                                    "
+                                '''
+                            }
+
+                            if (env.BUILD_FRONTEND == 'true') {
+                                echo "Deploying frontend..."
+                                sh '''
+                                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} "
+                                        sudo docker stop frontend || true && sudo docker rm frontend || true && \
+                                        sudo docker pull ${FRONTEND_IMAGE} && \
+                                        sudo docker run -d --name frontend -p 443:3002 \
+                                        -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \
+                                        -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
+                                        -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
+                                        ${FRONTEND_IMAGE}
+                                    "
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
+        } // Deploy
+
     } //stages
 
     post {
