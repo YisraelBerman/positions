@@ -5,12 +5,66 @@ pipeline {
 
     environment {
         GITHUB_TOKEN = credentials('github-token')
-        GITHUB_USER = credentials('github-user')
-        AWS_APPS_IP = credentials('AWS_apps_IP') 
-        SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
+        GITHUB_USER = credentials('github-user')      
+        AWS_INSTANCE_ID = credentials('dev-instance-ID')
+        SSH_KEY_CREDENTIALS = credentials('forssh')
+        AWS_REGION = 'us-east-1' 
+        AWS_ACCESS_KEY_ID = credentials('aws-access-key') // AWS Access Key from Jenkins Credentials
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key') // AWS Secret Key from Jenkins Credentials
     }
 
-    stages {         
+
+
+
+    stages { 
+
+        stage('AWS CLI Setup') {
+            steps {
+                script {
+                    // Check if AWS CLI is installed
+                    def awsCliInstalled = sh(script: 'which aws', returnStatus: true)
+                    
+                    // Install AWS CLI if not installed
+                    if (awsCliInstalled != 0) {
+                        sh '''
+                            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                            unzip awscliv2.zip
+                            sudo ./aws/install
+                        '''
+                    }
+                    
+                    // Configure AWS CLI with the provided credentials
+                    sh '''
+                        aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
+                        aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
+                        aws configure set region ${AWS_REGION}
+                    '''
+                }
+            }
+        } //AWS CLI Setup
+
+        stage('Start AWS EC2 Instance') {
+            steps {
+                script {
+                    def instanceState = sh(script: "aws ec2 describe-instances --instance-ids ${env.AWS_INSTANCE_ID} --query 'Reservations[*].Instances[*].State.Name' --output text --region ${env.AWS_REGION}", returnStdout: true).trim()
+                    
+                    if (instanceState != 'running') {
+                        sh "aws ec2 start-instances --instance-ids ${env.AWS_INSTANCE_ID} --region ${env.AWS_REGION}"
+                        sh "aws ec2 wait instance-running --instance-ids ${env.AWS_INSTANCE_ID} --region ${env.AWS_REGION}"
+                    }
+                    
+                    env.AWS_APPS_IP = sh(script: "aws ec2 describe-instances --instance-ids ${env.AWS_INSTANCE_ID} --query 'Reservations[*].Instances[*].PublicIpAddress' --output text --region ${env.AWS_REGION}", returnStdout: true).trim()
+                    env.SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
+
+                    // Run the on_start.sh script on the instance
+                    withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "bash -s" < ~/on_start.sh
+                        """
+                    }
+                }
+            }
+        } //Start AWS EC2 Instance       
         
         stage('Initialize') {
             steps {
