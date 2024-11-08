@@ -12,6 +12,7 @@ import traceback
 
 app = Flask(__name__)
 
+
 #dev and prod:
 #CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
 #local:
