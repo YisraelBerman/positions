@@ -11,7 +11,11 @@ import pandas as pd
 import traceback
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
+
+#dev and prod:
+#CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
+#local:
+CORS(app, origins=["http://localhost:3000"])
 
 app.config['TIMEZONE'] = pytz.UTC
 
@@ -146,12 +150,13 @@ def update_status():
         print("Volunteer not found.")
         return jsonify({'status': 'error', 'message': 'Volunteer not found.'}), 404
 
+# עמדות
 @app.route('/api/assignments', methods=['GET'])
 def get_assignments():
     assignments = assign_volunteers()
     return jsonify(assignments)
 
-
+# שכונות
 @app.route('/api/locations', methods=['GET'])
 def get_locations():
     # Filter volunteers to include only those who are available
@@ -166,42 +171,51 @@ def get_locations():
         volunteers = row['name']
         total_volunteers = len(volunteers)
 
-        # Determine the maximum number of groups of size GROUP_SIZE
-        num_groups = total_volunteers // GROUP_SIZE  # Full groups we can form
-        remaining_volunteers = total_volunteers % GROUP_SIZE  # Volunteers left after forming full groups
+        if total_volunteers == 0:
+            continue
 
-        if num_groups > 0 and remaining_volunteers >= num_groups:
-            # If remaining volunteers are enough to add one more volunteer to each group,
-            # split them evenly across all groups.
-            group_size = GROUP_SIZE + 1
-            groups = [volunteers[i * group_size:(i + 1) * group_size] for i in range(num_groups)]
-        elif num_groups > 0 and remaining_volunteers < num_groups:
-            # Redistribute volunteers across the groups to avoid a smaller group
-            # Increase the size of each group slightly to accommodate remaining volunteers
-            extra = remaining_volunteers
-            groups = []
-            start = 0
-            for i in range(num_groups):
-                group_size = GROUP_SIZE + (1 if extra > 0 else 0)
-                groups.append(volunteers[start:start + group_size])
-                start += group_size
-                if extra > 0:
-                    extra -= 1
-        else:
-            # If we can't form full groups of the desired size, put all in one group 
-            groups = [volunteers]
-
-        # Add each group to the locations list with names
-        for idx, group in enumerate(groups):
+        # If total volunteers is less than GROUP_SIZE, keep them all in one group
+        if total_volunteers < GROUP_SIZE:
             locations.append({
-                'name': f"{location_name} Group {idx + 1}",
-                'volunteers': group
+                'name': f"{location_name} Group 1",
+                'volunteers': volunteers
             })
+            continue
+
+        # Calculate number of groups based on total volunteers
+        # If volunteers >= 2 * GROUP_SIZE, split into multiple groups
+        if total_volunteers >= 2 * GROUP_SIZE:
+            num_groups = total_volunteers // GROUP_SIZE
+        else:
+            num_groups = 1
+        
+        # Calculate base size and extras
+        base_size = total_volunteers // num_groups
+        extras = total_volunteers % num_groups
+        
+        current_position = 0
+        for group_idx in range(num_groups):
+            # Calculate this group's size
+            group_size = base_size + (1 if group_idx < extras else 0)
+            
+            group_volunteers = volunteers[current_position:current_position + group_size]
+            locations.append({
+                'name': f"{location_name} Group {group_idx + 1}",
+                'volunteers': group_volunteers
+            })
+            current_position += group_size
 
     return jsonify(locations)
 
 
 
 if __name__ == '__main__':
-    app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
+    
+     # dev and Production settings (commented out during local testing)
+    #app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
+    
+    # Local development settings (remove before pushing to production)
+    app.run(host='127.0.0.1', port=5000, debug=True)
+    
+    
     app.config['TIMEZONE'] = pytz.UTC
