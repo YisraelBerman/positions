@@ -8,120 +8,67 @@ pipeline {
         GITHUB_USER = credentials('github-user')
         AWS_APPS_IP = credentials('AWS_apps_IP') 
         SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
-        
     }
 
     stages {  
-        stage('Get Latest Tag') {
-    steps {
-        script {
-            // First ensure we have the credentials and full git history with tags
-            checkout([$class: 'GitSCM',
-                     branches: [[name: '*/master']],
-                     extensions: [[$class: 'CloneOption',
-                                 noTags: false,
-                                 shallow: false,
-                                 depth: 0,
-                                 reference: '']],
-                     userRemoteConfigs: [[
-                         credentialsId: 'github',  // Use your existing github credentials ID
-                         url: 'https://github.com/YisraelBerman/positions.git'
-                     ]]])
-            
-            // Fetch all tags explicitly
-            withCredentials([usernamePassword(credentialsId: 'github', 
-                                           usernameVariable: 'GIT_USERNAME', 
-                                           passwordVariable: 'GIT_PASSWORD')]) {
-                sh 'git fetch --tags'
-                
-                // Get the latest tag, handling the case where no tags exist
-                def latestTag = sh(
-                    script: '''
-                        git tag -l | sort -V | tail -n1 || echo "v0.1.0"
-                    ''',
-                    returnStdout: true
-                ).trim()
-                
-                if (latestTag == '') {
-                    latestTag = 'v0.1.0'
-                }
-                
-                echo "Latest tag found: ${latestTag}"
-                
-                // Parse version components
-                def (major, minor, patch) = latestTag.replaceAll('v', '').tokenize('.')
-                
-                // Increment patch version
-                env.MAJOR = major
-                env.MINOR = minor
-                env.PATCH = (patch.toInteger() + 1).toString()
-                
-                // Create new version string
-                env.NEW_VERSION = "v${env.MAJOR}.${env.MINOR}.${env.PATCH}"
-                echo "New version will be: ${env.NEW_VERSION}"
-            }
-        }
-    }
-}
-
-stage('Tag Commit') {
-    steps {
-        script {
-            withCredentials([usernamePassword(credentialsId: 'github', 
-                                           usernameVariable: 'GIT_USERNAME', 
-                                           passwordVariable: 'GIT_PASSWORD')]) {
-                // Configure Git user
-                sh """
-                    git config user.email "jenkins@example.com"
-                    git config user.name "Jenkins"
-                    
-                    # Set up credentials helper
-                    git config credential.helper '!f() { echo "username=${GIT_USERNAME}"; echo "password=${GIT_PASSWORD}"; }; f'
-                    
-                    # Create and push tag
-                    git tag -a ${env.NEW_VERSION} -m "Release ${env.NEW_VERSION}"
-                    git push https://github.com/YisraelBerman/positions.git ${env.NEW_VERSION}
-                    
-                    # Clean up credentials helper
-                    git config --unset credential.helper
-                """
-            }
-        }
-    }
-}
-        stage('Initialize') {
+        stage('Initialize and Get Versions') {
             steps {
                 script {
-                    // Fetch the full commit hash
+                    // Ensure we have full history and tags
+                    checkout([$class: 'GitSCM',
+                            branches: [[name: '*/master']],
+                            extensions: [[$class: 'CloneOption',
+                                        noTags: false,
+                                        shallow: false,
+                                        depth: 0,
+                                        reference: '']],
+                            userRemoteConfigs: [[
+                                credentialsId: 'github',
+                                url: 'https://github.com/YisraelBerman/positions.git'
+                            ]]])
+                    
+                    // Get commit message
+                    def commitMessage = sh(
+                        script: "git log -1 --pretty=%B",
+                        returnStdout: true
+                    ).trim().toLowerCase()
+                    
+                    // Get latest tag and parse versions
+                    def latestTag = sh(
+                        script: '''
+                            git tag -l | sort -V | tail -n1 || echo "v1.0.0.0"
+                        ''',
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (latestTag == '') {
+                        latestTag = 'v1.0.0.0'
+                    }
+                    
+                    // Get previous versions from tag description
+                    def tagDescription = sh(
+                        script: "git tag -l --format='%(contents)' ${latestTag} || echo 'backend: 1.0.0\\nfrontend: 1.0.0'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    // Parse app version (4 parts)
+                    def (appMajor, appMinor, appPatch, appBuild) = latestTag.replaceAll('v', '').tokenize('.')
+                    
+                    // Parse backend and frontend versions from tag description
+                    def backendVersion = (tagDescription =~ /backend: (\d+\.\d+\.\d+)/)[0][1]
+                    def frontendVersion = (tagDescription =~ /frontend: (\d+\.\d+\.\d+)/)[0][1]
+                    
+                    def (backendMajor, backendMinor, backendPatch) = backendVersion.tokenize('.')
+                    def (frontendMajor, frontendMinor, frontendPatch) = frontendVersion.tokenize('.')
+
+                    // Initialize other environment variables
                     env.GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
-                    
-                    // Extract the short commit hash
                     env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
-                    
-                    // Get repository name from git remote URL
                     env.REPO_PATH = "ghcr.io/yisraelberman/positions"
-                                        
-                    // Define image names with repository path
-                    env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:${env.SHORT_COMMIT}"
-                    env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${env.SHORT_COMMIT}"
-                    
-                    
-                    // Initialize flags
                     env.BUILD_BACKEND = 'false'
                     env.BUILD_FRONTEND = 'false'
-                }
-            }
-        } // Initialize
 
-        
-        stage('Test') {
-            steps {
-                echo 'To be added someday.'
-            }
-        } // test
-        stage('Check for Changes') {
-            steps {
-                script {
+                    // Check for changes
                     def backendChanges = sh(
                         script: 'git diff --name-only HEAD~1..HEAD | grep "app/backend/" || true',
                         returnStdout: true
@@ -135,11 +82,91 @@ stage('Tag Commit') {
                     env.BACKEND_CHANGED = backendChanges ? 'true' : 'false'
                     env.FRONTEND_CHANGED = frontendChanges ? 'true' : 'false'
 
-                    echo "Backend Changed: ${env.BACKEND_CHANGED}"
-                    echo "Frontend Changed: ${env.FRONTEND_CHANGED}"
+                    // Update versions based on commit message and changes
+                    if (commitMessage.startsWith('breaking')) {
+                        appMinor = (appMinor.toInteger() + 1).toString()
+                        appPatch = '0'
+                        appBuild = '0'
+                    } else if (commitMessage.startsWith('feat')) {
+                        appPatch = (appPatch.toInteger() + 1).toString()
+                        appBuild = '0'
+                    } else if (commitMessage.startsWith('fix')) {
+                        appBuild = (appBuild.toInteger() + 1).toString()
+                    }
+                    
+                    if (env.BACKEND_CHANGED == 'true') {
+                        if (commitMessage.startsWith('breaking')) {
+                            backendMajor = (backendMajor.toInteger() + 1).toString()
+                            backendMinor = '0'
+                            backendPatch = '0'
+                        } else if (commitMessage.startsWith('feat')) {
+                            backendMinor = (backendMinor.toInteger() + 1).toString()
+                            backendPatch = '0'
+                        } else if (commitMessage.startsWith('fix')) {
+                            backendPatch = (backendPatch.toInteger() + 1).toString()
+                        }
+                    }
+                    
+                    if (env.FRONTEND_CHANGED == 'true') {
+                        if (commitMessage.startsWith('breaking')) {
+                            frontendMajor = (frontendMajor.toInteger() + 1).toString()
+                            frontendMinor = '0'
+                            frontendPatch = '0'
+                        } else if (commitMessage.startsWith('feat')) {
+                            frontendMinor = (frontendMinor.toInteger() + 1).toString()
+                            frontendPatch = '0'
+                        } else if (commitMessage.startsWith('fix')) {
+                            frontendPatch = (frontendPatch.toInteger() + 1).toString()
+                        }
+                    }
+                    
+                    // Set new versions
+                    env.NEW_VERSION = "v${appMajor}.${appMinor}.${appPatch}.${appBuild}"
+                    env.NEW_BACKEND_VERSION = "${backendMajor}.${backendMinor}.${backendPatch}"
+                    env.NEW_FRONTEND_VERSION = "${frontendMajor}.${frontendMinor}.${frontendPatch}"
+                    
+                    // Set image names with versions
+                    env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:${env.NEW_BACKEND_VERSION}"
+                    env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${env.NEW_FRONTEND_VERSION}"
+
+                    echo "App version: ${env.NEW_VERSION}"
+                    echo "Backend version: ${env.NEW_BACKEND_VERSION}"
+                    echo "Frontend version: ${env.NEW_FRONTEND_VERSION}"
+                    echo "Backend changed: ${env.BACKEND_CHANGED}"
+                    echo "Frontend changed: ${env.FRONTEND_CHANGED}"
                 }
             }
-        } //Check for Changes
+        }
+
+        stage('Create Tag') {
+            steps {
+                script {
+                    def tagMessage = """Release ${env.NEW_VERSION}
+backend: ${env.NEW_BACKEND_VERSION}
+frontend: ${env.NEW_FRONTEND_VERSION}"""
+
+                    withCredentials([usernamePassword(credentialsId: 'github', 
+                                                   usernameVariable: 'GIT_USERNAME', 
+                                                   passwordVariable: 'GIT_PASSWORD')]) {
+                        sh """
+                            git config user.email "jenkins@example.com"
+                            git config user.name "Jenkins"
+                            git config credential.helper '!f() { echo "username=${GIT_USERNAME}"; echo "password=${GIT_PASSWORD}"; }; f'
+                            git tag -a ${env.NEW_VERSION} -m "${tagMessage}"
+                            git push https://github.com/YisraelBerman/positions.git ${env.NEW_VERSION}
+                            git config --unset credential.helper
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                echo 'To be added someday.'
+            }
+        }
+
         stage('Build') {
             parallel {
                 stage('Build Backend') {
@@ -150,12 +177,12 @@ stage('Tag Commit') {
                     }
                     steps {
                         script {
-                            echo 'Changes detected in the backend directory. Building backend image...'
+                            echo "Building backend image version ${env.NEW_BACKEND_VERSION}..."
                             sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/dockerfile ./app/backend"
-                            env.BUILD_BACKEND = 'true' 
+                            env.BUILD_BACKEND = 'true'
                         }
                     }
-                } // Build Backend
+                }
                 stage('Build Frontend') {
                     when {
                         expression {
@@ -164,14 +191,14 @@ stage('Tag Commit') {
                     }
                     steps {
                         script {
-                            echo 'Changes detected in the frontend directory. Building frontend image...'
-                            sh "docker build --build-arg REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"                            
-                            env.BUILD_FRONTEND = 'true' 
+                            echo "Building frontend image version ${env.NEW_FRONTEND_VERSION}..."
+                            sh "docker build --build-arg REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"
+                            env.BUILD_FRONTEND = 'true'
                         }
                     }
-                } // Build Frontend
+                }
             }
-        } // Build
+        }
 
         stage('Docker Login') {
             when {
@@ -180,7 +207,7 @@ stage('Tag Commit') {
             steps {
                 sh "echo ${env.GITHUB_TOKEN} | docker login ghcr.io -u ${env.GITHUB_USER} --password-stdin"
             }
-        } // Docker Login
+        }
 
         stage('Push Images to GitHub') {
             parallel {
@@ -190,7 +217,7 @@ stage('Tag Commit') {
                     }
                     steps {
                         script {
-                            echo 'Pushing backend image to GitHub...'
+                            echo "Pushing backend image version ${env.NEW_BACKEND_VERSION}..."
                             sh "docker push ${env.BACKEND_IMAGE}"
                         }
                     }
@@ -201,60 +228,57 @@ stage('Tag Commit') {
                     }
                     steps {
                         script {
-                            echo 'Pushing frontend image to GitHub...'
+                            echo "Pushing frontend image version ${env.NEW_FRONTEND_VERSION}..."
                             sh "docker push ${env.FRONTEND_IMAGE}"
                         }
                     }
                 }
             }
-        } // Push Images to GitHub
-
-        // Stop and remove existing containers and Pull new images from the correct repositories and run them
-        stage('Deploy') {
-        when {
-            expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
         }
-        steps {
-            script {
-                withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
-                    
-                    if (env.BUILD_BACKEND == 'true') {
-                        sh """
-                        ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
-                            sudo docker stop backend || true && sudo docker rm backend || true && \
-                            sudo docker pull ${env.BACKEND_IMAGE} && \
-                            sudo docker run -d --name backend -p 5000:5000 \
-                            -e FLASK_ENV=production \
-                            -e CORS_ORIGIN=https://app.yisraelberman.com \
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
-                            ${env.BACKEND_IMAGE}
-                        "
-                        """
-                    }
 
-                    if (env.BUILD_FRONTEND == 'true') {
-                        sh """
-                        ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
-                            sudo docker stop frontend || true && sudo docker rm frontend || true;
-                            sudo docker pull ${env.FRONTEND_IMAGE};
-                            sudo docker run -d --name frontend -p 443:3002 \\
-                            -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \\
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \\
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \\
-                            ${env.FRONTEND_IMAGE};
-                        "
-                        """
+        stage('Deploy') {
+            when {
+                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
+            }
+            steps {
+                script {
+                    withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
+                        if (env.BUILD_BACKEND == 'true') {
+                            sh """
+                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
+                                sudo docker stop backend || true && sudo docker rm backend || true && \
+                                sudo docker pull ${env.BACKEND_IMAGE} && \
+                                sudo docker run -d --name backend -p 5000:5000 \
+                                -e FLASK_ENV=production \
+                                -e CORS_ORIGIN=https://app.yisraelberman.com \
+                                -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
+                                -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
+                                ${env.BACKEND_IMAGE}
+                            "
+                            """
+                        }
+
+                        if (env.BUILD_FRONTEND == 'true') {
+                            sh """
+                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
+                                sudo docker stop frontend || true && sudo docker rm frontend || true;
+                                sudo docker pull ${env.FRONTEND_IMAGE};
+                                sudo docker run -d --name frontend -p 443:3002 \\
+                                -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \\
+                                -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \\
+                                -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \\
+                                ${env.FRONTEND_IMAGE};
+                            "
+                            """
+                        }
                     }
-                } 
+                }
             }
         }
-    } //deploy
-    } //stages
+    }
 
     post {
         always {
-            // Clean up the workspace
             cleanWs()
         }
     }
