@@ -11,155 +11,155 @@ pipeline {
     }
 
     stages {  
-stage('Initialize and Get Versions') {
-    steps {
-        script {
-            // Ensure we have full history and tags
-            checkout([$class: 'GitSCM',
-                    branches: [[name: '*/master']],
-                    extensions: [[$class: 'CloneOption',
-                                noTags: false,
-                                shallow: false,
-                                depth: 0,
-                                reference: '']],
-                    userRemoteConfigs: [[
-                        credentialsId: 'github',
-                        url: 'https://github.com/YisraelBerman/positions.git'
-                    ]]])
-            
-            // Get commit message
-            def commitMessage = sh(
-                script: "git log -1 --pretty=%B",
-                returnStdout: true
-            ).trim().toLowerCase()
-            
-            // Get the latest tag
-            def latestTag = sh(
-                script: 'git tag -l | sort -V | tail -n1 || true',
-                returnStdout: true
-            ).trim()
-            
-            echo "Found latest tag: ${latestTag}"
-            
-            // Get tag description
-            def tagDescription = sh(
-                script: "git tag -l --format='%(contents)' ${latestTag} || true",
-                returnStdout: true
-            ).trim()
-            
-            echo "Tag description: ${tagDescription}"
-            
-            // Parse app version (4 parts)
-            def (appMajor, appMinor, appPatch, appBuild) = latestTag.replaceAll('v', '').tokenize('.')
-            
-            // Parse component versions using string operations instead of regex
-            def descLines = tagDescription.split('\n')
-            
-            // Initialize versions with null to detect if they were found in tag description
-            def backendVersion = null
-            def frontendVersion = null
-            
-            // Trim lines and parse versions
-            descLines.each { line ->
-                def trimmedLine = line.trim()
-                if (trimmedLine.startsWith('backend:')) {
-                    backendVersion = trimmedLine.substring('backend:'.length()).trim()
-                } else if (trimmedLine.startsWith('frontend:')) {
-                    frontendVersion = trimmedLine.substring('frontend:'.length()).trim()
-                }
-            }
-            
-            // Set default versions only if not found in tag
-            backendVersion = backendVersion ?: '1.0.0'
-            frontendVersion = frontendVersion ?: '1.0.0'
-            
-            echo "Parsed versions from tag:"
-            echo "Backend from tag: ${backendVersion}"
-            echo "Frontend from tag: ${frontendVersion}"
-            
-            // Store original versions
-            env.NEW_BACKEND_VERSION = backendVersion
-            env.NEW_FRONTEND_VERSION = frontendVersion
-            
-            // Check for changes
-            def backendChanges = sh(
-                script: 'git diff --name-only HEAD~1..HEAD | grep "app/backend/" || true',
-                returnStdout: true
-            ).trim()
+        stage('Initialize and Get Versions') {
+            steps {
+                script {
+                    // Ensure we have full history and tags
+                    checkout([$class: 'GitSCM',
+                            branches: [[name: '*/master']],
+                            extensions: [[$class: 'CloneOption',
+                                        noTags: false,
+                                        shallow: false,
+                                        depth: 0,
+                                        reference: '']],
+                            userRemoteConfigs: [[
+                                credentialsId: 'github',
+                                url: 'https://github.com/YisraelBerman/positions.git'
+                            ]]])
+                    
+                    // Get commit message
+                    def commitMessage = sh(
+                        script: "git log -1 --pretty=%B",
+                        returnStdout: true
+                    ).trim().toLowerCase()
+                    
+                    // Get the latest tag
+                    def latestTag = sh(
+                        script: 'git tag -l | sort -V | tail -n1 || true',
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Found latest tag: ${latestTag}"
+                    
+                    // Get tag description
+                    def tagDescription = sh(
+                        script: "git tag -l --format='%(contents)' ${latestTag} || true",
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Tag description: ${tagDescription}"
+                    
+                    // Parse app version (4 parts)
+                    def (appMajor, appMinor, appPatch, appBuild) = latestTag.replaceAll('v', '').tokenize('.')
+                    
+                    // Parse component versions using string operations instead of regex
+                    def descLines = tagDescription.split('\n')
+                    
+                    // Initialize versions with null to detect if they were found in tag description
+                    def backendVersion = null
+                    def frontendVersion = null
+                    
+                    // Trim lines and parse versions
+                    descLines.each { line ->
+                        def trimmedLine = line.trim()
+                        if (trimmedLine.startsWith('backend:')) {
+                            backendVersion = trimmedLine.substring('backend:'.length()).trim()
+                        } else if (trimmedLine.startsWith('frontend:')) {
+                            frontendVersion = trimmedLine.substring('frontend:'.length()).trim()
+                        }
+                    }
+                    
+                    // Set default versions only if not found in tag
+                    backendVersion = backendVersion ?: '1.0.0'
+                    frontendVersion = frontendVersion ?: '1.0.0'
+                    
+                    echo "Parsed versions from tag:"
+                    echo "Backend from tag: ${backendVersion}"
+                    echo "Frontend from tag: ${frontendVersion}"
+                    
+                    // Store original versions
+                    env.NEW_BACKEND_VERSION = backendVersion
+                    env.NEW_FRONTEND_VERSION = frontendVersion
+                    
+                    // Check for changes
+                    def backendChanges = sh(
+                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/backend/" || true',
+                        returnStdout: true
+                    ).trim()
 
-            def frontendChanges = sh(
-                script: 'git diff --name-only HEAD~1..HEAD | grep "app/frontend/" || true',
-                returnStdout: true
-            ).trim()
+                    def frontendChanges = sh(
+                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/frontend/" || true',
+                        returnStdout: true
+                    ).trim()
 
-            env.BACKEND_CHANGED = backendChanges ? 'true' : 'false'
-            env.FRONTEND_CHANGED = frontendChanges ? 'true' : 'false'
-            
-            // Update app version based on commit message
-            if (commitMessage.startsWith('breaking')) {
-                appMinor = (appMinor.toInteger() + 1).toString()
-                appPatch = '0'
-                appBuild = '0'
-            } else if (commitMessage.startsWith('feat')) {
-                appPatch = (appPatch.toInteger() + 1).toString()
-                appBuild = '0'
-            } else if (commitMessage.startsWith('fix')) {
-                appBuild = (appBuild.toInteger() + 1).toString()
-            }
-            
-            // Only update backend version if changed
-            if (env.BACKEND_CHANGED == 'true') {
-                def (backendMajor, backendMinor, backendPatch) = backendVersion.tokenize('.')
-                if (commitMessage.startsWith('breaking')) {
-                    backendMajor = (backendMajor.toInteger() + 1).toString()
-                    backendMinor = '0'
-                    backendPatch = '0'
-                } else if (commitMessage.startsWith('feat')) {
-                    backendMinor = (backendMinor.toInteger() + 1).toString()
-                    backendPatch = '0'
-                } else if (commitMessage.startsWith('fix')) {
-                    backendPatch = (backendPatch.toInteger() + 1).toString()
+                    env.BACKEND_CHANGED = backendChanges ? 'true' : 'false'
+                    env.FRONTEND_CHANGED = frontendChanges ? 'true' : 'false'
+                    
+                    // Update app version based on commit message
+                    if (commitMessage.startsWith('breaking')) {
+                        appMinor = (appMinor.toInteger() + 1).toString()
+                        appPatch = '0'
+                        appBuild = '0'
+                    } else if (commitMessage.startsWith('feat')) {
+                        appPatch = (appPatch.toInteger() + 1).toString()
+                        appBuild = '0'
+                    } else if (commitMessage.startsWith('fix')) {
+                        appBuild = (appBuild.toInteger() + 1).toString()
+                    }
+                    
+                    // Only update backend version if changed
+                    if (env.BACKEND_CHANGED == 'true') {
+                        def (backendMajor, backendMinor, backendPatch) = backendVersion.tokenize('.')
+                        if (commitMessage.startsWith('breaking')) {
+                            backendMajor = (backendMajor.toInteger() + 1).toString()
+                            backendMinor = '0'
+                            backendPatch = '0'
+                        } else if (commitMessage.startsWith('feat')) {
+                            backendMinor = (backendMinor.toInteger() + 1).toString()
+                            backendPatch = '0'
+                        } else if (commitMessage.startsWith('fix')) {
+                            backendPatch = (backendPatch.toInteger() + 1).toString()
+                        }
+                        env.NEW_BACKEND_VERSION = "${backendMajor}.${backendMinor}.${backendPatch}"
+                        env.BUILD_BACKEND = 'true'
+                    }
+                    
+                    // Only update frontend version if changed
+                    if (env.FRONTEND_CHANGED == 'true') {
+                        def (frontendMajor, frontendMinor, frontendPatch) = frontendVersion.tokenize('.')
+                        if (commitMessage.startsWith('breaking')) {
+                            frontendMajor = (frontendMajor.toInteger() + 1).toString()
+                            frontendMinor = '0'
+                            frontendPatch = '0'
+                        } else if (commitMessage.startsWith('feat')) {
+                            frontendMinor = (frontendMinor.toInteger() + 1).toString()
+                            frontendPatch = '0'
+                        } else if (commitMessage.startsWith('fix')) {
+                            frontendPatch = (frontendPatch.toInteger() + 1).toString()
+                        }
+                        env.NEW_FRONTEND_VERSION = "${frontendMajor}.${frontendMinor}.${frontendPatch}"
+                        env.BUILD_FRONTEND = 'true'
+                    }
+                    
+                    // Set new app version
+                    env.NEW_VERSION = "v${appMajor}.${appMinor}.${appPatch}.${appBuild}"
+                    
+                    echo "Setting versions:"
+                    echo "App: ${env.NEW_VERSION}"
+                    echo "Backend: ${env.NEW_BACKEND_VERSION} (changed: ${env.BACKEND_CHANGED})"
+                    echo "Frontend: ${env.NEW_FRONTEND_VERSION} (changed: ${env.FRONTEND_CHANGED})"
+                    
+                    // Set up other environment variables
+                    env.GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
+                    env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
+                    env.REPO_PATH = "ghcr.io/yisraelberman/positions"
+                    
+                    // Define image names with versions
+                    env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:${env.NEW_BACKEND_VERSION}"
+                    env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${env.NEW_FRONTEND_VERSION}"
                 }
-                env.NEW_BACKEND_VERSION = "${backendMajor}.${backendMinor}.${backendPatch}"
-                env.BUILD_BACKEND = 'true'
             }
-            
-            // Only update frontend version if changed
-            if (env.FRONTEND_CHANGED == 'true') {
-                def (frontendMajor, frontendMinor, frontendPatch) = frontendVersion.tokenize('.')
-                if (commitMessage.startsWith('breaking')) {
-                    frontendMajor = (frontendMajor.toInteger() + 1).toString()
-                    frontendMinor = '0'
-                    frontendPatch = '0'
-                } else if (commitMessage.startsWith('feat')) {
-                    frontendMinor = (frontendMinor.toInteger() + 1).toString()
-                    frontendPatch = '0'
-                } else if (commitMessage.startsWith('fix')) {
-                    frontendPatch = (frontendPatch.toInteger() + 1).toString()
-                }
-                env.NEW_FRONTEND_VERSION = "${frontendMajor}.${frontendMinor}.${frontendPatch}"
-                env.BUILD_FRONTEND = 'true'
-            }
-            
-            // Set new app version
-            env.NEW_VERSION = "v${appMajor}.${appMinor}.${appPatch}.${appBuild}"
-            
-            echo "Setting versions:"
-            echo "App: ${env.NEW_VERSION}"
-            echo "Backend: ${env.NEW_BACKEND_VERSION} (changed: ${env.BACKEND_CHANGED})"
-            echo "Frontend: ${env.NEW_FRONTEND_VERSION} (changed: ${env.FRONTEND_CHANGED})"
-            
-            // Set up other environment variables
-            env.GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
-            env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
-            env.REPO_PATH = "ghcr.io/yisraelberman/positions"
-            
-            // Define image names with versions
-            env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:${env.NEW_BACKEND_VERSION}"
-            env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${env.NEW_FRONTEND_VERSION}"
-        }
-    }
-}
+        } // Initialize and Get Versions
         stage('Create Tag') {
             steps {
                 script {
@@ -181,13 +181,13 @@ stage('Initialize and Get Versions') {
                     }
                 }
             }
-}
+        } // Create Tag
         
         stage('Test') {
             steps {
                 echo 'To be added someday.'
             }
-        }
+        } // test
 
         stage('Build') {
             parallel {
@@ -220,7 +220,7 @@ stage('Initialize and Get Versions') {
                     }
                 }
             }
-        }
+        } // Build
 
         stage('Docker Login') {
             when {
@@ -229,7 +229,7 @@ stage('Initialize and Get Versions') {
             steps {
                 sh "echo ${env.GITHUB_TOKEN} | docker login ghcr.io -u ${env.GITHUB_USER} --password-stdin"
             }
-        }
+        } // Docker Login
 
         stage('Push Images to GitHub') {
             parallel {
@@ -256,7 +256,7 @@ stage('Initialize and Get Versions') {
                     }
                 }
             }
-        }
+        } // Push Images to GitHub
 
         stage('Deploy') {
             when {
@@ -280,23 +280,23 @@ stage('Initialize and Get Versions') {
                             """
                         }
 
-                        if (env.BUILD_FRONTEND == 'true') {
-                            sh """
-                            ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
-                                sudo docker stop frontend || true && sudo docker rm frontend || true;
-                                sudo docker pull ${env.FRONTEND_IMAGE};
-                                sudo docker run -d --name frontend -p 443:3002 \\
-                                -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \\
-                                -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \\
-                                -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \\
-                                ${env.FRONTEND_IMAGE};
-                            "
-                            """
-                        }
+                        // Always restart frontend with new version, even if only backend changed
+                        sh """
+                        ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
+                            sudo docker stop frontend || true && sudo docker rm frontend || true;
+                            ${env.BUILD_FRONTEND == 'true' ? "sudo docker pull ${env.FRONTEND_IMAGE};" : ''}
+                            sudo docker run -d --name frontend -p 443:3002 \\
+                            -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \\
+                            -e REACT_APP_VERSION='${env.NEW_VERSION}' \\
+                            -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \\
+                            -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \\
+                            ${env.FRONTEND_IMAGE};
+                        "
+                        """
                     }
                 }
             }
-        }
+        } // Deploy
     }
 
     post {
