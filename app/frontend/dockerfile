@@ -19,14 +19,19 @@ COPY . .
 # Set environment variables
 ENV PORT=3002
 ARG REACT_APP_BACKEND_URL
-
 ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
 
 # Build the app
 RUN npm run build
 
+# Create a script to update version at container start
+RUN echo '#!/bin/sh' > /update-version.sh && \
+    echo 'echo "Updating version to: $VERSION"' >> /update-version.sh && \
+    echo 'sed -i "s/APP_VERSION_PLACEHOLDER/$VERSION/" /app/frontend/build/index.html' >> /update-version.sh && \
+    chmod +x /update-version.sh
+
 # Expose the frontend port
 EXPOSE 3002
 
-# Run the frontend app
-CMD ["serve", "-s", "build", "--ssl-cert", "/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem", "--ssl-key", "/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem", "--listen", "3002"]
+# New CMD that runs version update first
+CMD ["/bin/sh", "-c", "/update-version.sh && serve -s build --ssl-cert /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem --ssl-key /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem --listen 3002"]
