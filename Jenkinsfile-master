@@ -54,19 +54,28 @@ stage('Initialize and Get Versions') {
             
             // Parse component versions using string operations instead of regex
             def descLines = tagDescription.split('\n')
-            def backendVersion = '1.0.0'
-            def frontendVersion = '1.0.0'
             
+            // Initialize versions with null to detect if they were found in tag description
+            def backendVersion = null
+            def frontendVersion = null
+            
+            // Trim lines and parse versions
             descLines.each { line ->
-                if (line.startsWith('backend: ')) {
-                    backendVersion = line.substring('backend: '.length())
-                } else if (line.startsWith('frontend: ')) {
-                    frontendVersion = line.substring('frontend: '.length())
+                def trimmedLine = line.trim()
+                if (trimmedLine.startsWith('backend:')) {
+                    backendVersion = trimmedLine.substring('backend:'.length()).trim()
+                } else if (trimmedLine.startsWith('frontend:')) {
+                    frontendVersion = trimmedLine.substring('frontend:'.length()).trim()
                 }
             }
             
-            def (backendMajor, backendMinor, backendPatch) = backendVersion.tokenize('.')
-            def (frontendMajor, frontendMinor, frontendPatch) = frontendVersion.tokenize('.')
+            // Set default versions only if not found in tag
+            backendVersion = backendVersion ?: '1.0.0'
+            frontendVersion = frontendVersion ?: '1.0.0'
+            
+            echo "Parsed versions from tag:"
+            echo "Backend from tag: ${backendVersion}"
+            echo "Frontend from tag: ${frontendVersion}"
             
             // Store original versions
             env.NEW_BACKEND_VERSION = backendVersion
@@ -86,7 +95,7 @@ stage('Initialize and Get Versions') {
             env.BACKEND_CHANGED = backendChanges ? 'true' : 'false'
             env.FRONTEND_CHANGED = frontendChanges ? 'true' : 'false'
             
-            // Update versions based on commit message
+            // Update app version based on commit message
             if (commitMessage.startsWith('breaking')) {
                 appMinor = (appMinor.toInteger() + 1).toString()
                 appPatch = '0'
@@ -100,6 +109,7 @@ stage('Initialize and Get Versions') {
             
             // Only update backend version if changed
             if (env.BACKEND_CHANGED == 'true') {
+                def (backendMajor, backendMinor, backendPatch) = backendVersion.tokenize('.')
                 if (commitMessage.startsWith('breaking')) {
                     backendMajor = (backendMajor.toInteger() + 1).toString()
                     backendMinor = '0'
@@ -116,6 +126,7 @@ stage('Initialize and Get Versions') {
             
             // Only update frontend version if changed
             if (env.FRONTEND_CHANGED == 'true') {
+                def (frontendMajor, frontendMinor, frontendPatch) = frontendVersion.tokenize('.')
                 if (commitMessage.startsWith('breaking')) {
                     frontendMajor = (frontendMajor.toInteger() + 1).toString()
                     frontendMinor = '0'
@@ -148,7 +159,7 @@ stage('Initialize and Get Versions') {
             env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${env.NEW_FRONTEND_VERSION}"
         }
     }
-}    
+}
         stage('Create Tag') {
             steps {
                 script {
