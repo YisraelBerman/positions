@@ -11,7 +11,7 @@ pipeline {
     }
 
     stages {  
-        stage('Initialize and Get Versions') {
+stage('Initialize and Get Versions') {
     steps {
         script {
             // Ensure we have full history and tags
@@ -68,6 +68,10 @@ pipeline {
             def (backendMajor, backendMinor, backendPatch) = backendVersion.tokenize('.')
             def (frontendMajor, frontendMinor, frontendPatch) = frontendVersion.tokenize('.')
             
+            // Store original versions
+            env.NEW_BACKEND_VERSION = backendVersion
+            env.NEW_FRONTEND_VERSION = frontendVersion
+            
             // Check for changes
             def backendChanges = sh(
                 script: 'git diff --name-only HEAD~1..HEAD | grep "app/backend/" || true',
@@ -94,7 +98,7 @@ pipeline {
                 appBuild = (appBuild.toInteger() + 1).toString()
             }
             
-            // Update backend version if changed
+            // Only update backend version if changed
             if (env.BACKEND_CHANGED == 'true') {
                 if (commitMessage.startsWith('breaking')) {
                     backendMajor = (backendMajor.toInteger() + 1).toString()
@@ -106,10 +110,11 @@ pipeline {
                 } else if (commitMessage.startsWith('fix')) {
                     backendPatch = (backendPatch.toInteger() + 1).toString()
                 }
+                env.NEW_BACKEND_VERSION = "${backendMajor}.${backendMinor}.${backendPatch}"
                 env.BUILD_BACKEND = 'true'
             }
             
-            // Update frontend version if changed
+            // Only update frontend version if changed
             if (env.FRONTEND_CHANGED == 'true') {
                 if (commitMessage.startsWith('breaking')) {
                     frontendMajor = (frontendMajor.toInteger() + 1).toString()
@@ -121,18 +126,17 @@ pipeline {
                 } else if (commitMessage.startsWith('fix')) {
                     frontendPatch = (frontendPatch.toInteger() + 1).toString()
                 }
+                env.NEW_FRONTEND_VERSION = "${frontendMajor}.${frontendMinor}.${frontendPatch}"
                 env.BUILD_FRONTEND = 'true'
             }
             
-            // Set new versions
+            // Set new app version
             env.NEW_VERSION = "v${appMajor}.${appMinor}.${appPatch}.${appBuild}"
-            env.NEW_BACKEND_VERSION = "${backendMajor}.${backendMinor}.${backendPatch}"
-            env.NEW_FRONTEND_VERSION = "${frontendMajor}.${frontendMinor}.${frontendPatch}"
             
             echo "Setting versions:"
             echo "App: ${env.NEW_VERSION}"
-            echo "Backend: ${env.NEW_BACKEND_VERSION}"
-            echo "Frontend: ${env.NEW_FRONTEND_VERSION}"
+            echo "Backend: ${env.NEW_BACKEND_VERSION} (changed: ${env.BACKEND_CHANGED})"
+            echo "Frontend: ${env.NEW_FRONTEND_VERSION} (changed: ${env.FRONTEND_CHANGED})"
             
             // Set up other environment variables
             env.GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
@@ -142,13 +146,9 @@ pipeline {
             // Define image names with versions
             env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:${env.NEW_BACKEND_VERSION}"
             env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${env.NEW_FRONTEND_VERSION}"
-
-            echo "Changes detected:"
-            echo "Backend changed: ${env.BACKEND_CHANGED}"
-            echo "Frontend changed: ${env.FRONTEND_CHANGED}"
         }
     }
-}        
+}    
         stage('Create Tag') {
             steps {
                 script {
