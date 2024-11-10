@@ -8,30 +8,45 @@ pipeline {
         GITHUB_USER = credentials('github-user')
         AWS_APPS_IP = credentials('AWS_apps_IP') 
         SSH_TARGET = "ubuntu@${env.AWS_APPS_IP}"
-        // Define default version components if no previous tag exists
-        MAJOR = '0'
-        MINOR = '1'
-        PATCH = '0'
+        
     }
 
     stages {  
         stage('Get Latest Tag') {
     steps {
         script {
-            // Fetch all tags using the configured credentials
-            withCredentials([usernamePassword(credentialsId: 'github-token', 
-                                           usernameVariable: 'GITHUB_USER', 
-                                           passwordVariable: 'GITHUB_TOKEN')]) {
-                def remoteUrl = sh(script: 'git config --get remote.origin.url', returnStdout: true).trim()
-                def authenticatedUrl = remoteUrl.replaceFirst('https://', "https://${GITHUB_USER}:${GITHUB_TOKEN}@")
-                sh "git remote set-url origin ${authenticatedUrl}"
+            // First ensure we have the credentials and full git history with tags
+            checkout([$class: 'GitSCM',
+                     branches: [[name: '*/master']],
+                     extensions: [[$class: 'CloneOption',
+                                 noTags: false,
+                                 shallow: false,
+                                 depth: 0,
+                                 reference: '']],
+                     userRemoteConfigs: [[
+                         credentialsId: 'github',  // Use your existing github credentials ID
+                         url: 'https://github.com/YisraelBerman/positions.git'
+                     ]]])
+            
+            // Fetch all tags explicitly
+            withCredentials([usernamePassword(credentialsId: 'github', 
+                                           usernameVariable: 'GIT_USERNAME', 
+                                           passwordVariable: 'GIT_PASSWORD')]) {
                 sh 'git fetch --tags'
                 
                 // Get the latest tag, handling the case where no tags exist
                 def latestTag = sh(
-                    script: 'git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.1.0"',
+                    script: '''
+                        git tag -l | sort -V | tail -n1 || echo "v0.1.0"
+                    ''',
                     returnStdout: true
                 ).trim()
+                
+                if (latestTag == '') {
+                    latestTag = 'v0.1.0'
+                }
+                
+                echo "Latest tag found: ${latestTag}"
                 
                 // Parse version components
                 def (major, minor, patch) = latestTag.replaceAll('v', '').tokenize('.')
@@ -43,9 +58,7 @@ pipeline {
                 
                 // Create new version string
                 env.NEW_VERSION = "v${env.MAJOR}.${env.MINOR}.${env.PATCH}"
-                
-                // Reset the remote URL
-                sh "git remote set-url origin ${remoteUrl}"
+                echo "New version will be: ${env.NEW_VERSION}"
             }
         }
     }
@@ -54,25 +67,24 @@ pipeline {
 stage('Tag Commit') {
     steps {
         script {
-            withCredentials([usernamePassword(credentialsId: 'github-token', 
-                                           usernameVariable: 'GITHUB_USER', 
-                                           passwordVariable: 'GITHUB_TOKEN')]) {
-                def remoteUrl = sh(script: 'git config --get remote.origin.url', returnStdout: true).trim()
-                def authenticatedUrl = remoteUrl.replaceFirst('https://', "https://${GITHUB_USER}:${GITHUB_TOKEN}@")
-                
+            withCredentials([usernamePassword(credentialsId: 'github', 
+                                           usernameVariable: 'GIT_USERNAME', 
+                                           passwordVariable: 'GIT_PASSWORD')]) {
                 // Configure Git user
                 sh """
                     git config user.email "jenkins@example.com"
                     git config user.name "Jenkins"
-                    git remote set-url origin ${authenticatedUrl}
+                    
+                    # Set up credentials helper
+                    git config credential.helper '!f() { echo "username=${GIT_USERNAME}"; echo "password=${GIT_PASSWORD}"; }; f'
+                    
+                    # Create and push tag
                     git tag -a ${env.NEW_VERSION} -m "Release ${env.NEW_VERSION}"
-                    git push origin ${env.NEW_VERSION}
+                    git push https://github.com/YisraelBerman/positions.git ${env.NEW_VERSION}
+                    
+                    # Clean up credentials helper
+                    git config --unset credential.helper
                 """
-                
-                // Reset the remote URL
-                sh "git remote set-url origin ${remoteUrl}"
-                
-                echo "Successfully created and pushed tag: ${env.NEW_VERSION}"
             }
         }
     }
