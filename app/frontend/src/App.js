@@ -8,7 +8,7 @@ import Footer from './Footer';
 import axios from './axiosConfig';
 import { debounce } from 'lodash';
 
-const APP_VERSION = '0.1.1'; 
+const APP_VERSION = process.env.REACT_APP_VERSION || '0.1.1'; 
 const DEVELOPER_NAME = 'Yisrael Berman  058-404-6555';
 
 function App() {
