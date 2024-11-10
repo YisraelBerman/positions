@@ -152,4 +152,20 @@ Remember to replace placeholders like `your-hosted-zone-id`, `yourdomain.com`, e
 
 
 
+# Tag - increae major tag:
+For example, if you want to go from v1.2.3.4 to v2.0.0.0:
+'''
+   # Check current tags
+   git tag -l
 
+   # Create new tag
+   git tag -a v2.0.0.0 -m "Release v2.0.0.0
+   backend: 2.0.0
+   frontend: 2.0.0"
+
+   # Verify the tag and its message
+   git show v2.0.0.0
+
+   # Push the tag
+   git push origin v2.0.0.0
+'''
