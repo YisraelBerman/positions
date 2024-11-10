@@ -16,50 +16,67 @@ pipeline {
 
     stages {  
         stage('Get Latest Tag') {
-            steps {
-                script {
-                    // Fetch all tags
-                    sh 'git fetch --tags'
-                    
-                    // Get the latest tag, handling the case where no tags exist
-                    def latestTag = sh(
-                        script: 'git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.1.0"',
-                        returnStdout: true
-                    ).trim()
-                    
-                    // Parse version components
-                    def (major, minor, patch) = latestTag.replaceAll('v', '').tokenize('.')
-                    
-                    // Increment patch version
-                    env.MAJOR = major
-                    env.MINOR = minor
-                    env.PATCH = (patch.toInteger() + 1).toString()
-                    
-                    // Create new version string
-                    env.NEW_VERSION = "v${env.MAJOR}.${env.MINOR}.${env.PATCH}"
-                }
+    steps {
+        script {
+            // Fetch all tags using the configured credentials
+            withCredentials([usernamePassword(credentialsId: 'github-token', 
+                                           usernameVariable: 'GITHUB_USER', 
+                                           passwordVariable: 'GITHUB_TOKEN')]) {
+                def remoteUrl = sh(script: 'git config --get remote.origin.url', returnStdout: true).trim()
+                def authenticatedUrl = remoteUrl.replaceFirst('https://', "https://${GITHUB_USER}:${GITHUB_TOKEN}@")
+                sh "git remote set-url origin ${authenticatedUrl}"
+                sh 'git fetch --tags'
+                
+                // Get the latest tag, handling the case where no tags exist
+                def latestTag = sh(
+                    script: 'git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.1.0"',
+                    returnStdout: true
+                ).trim()
+                
+                // Parse version components
+                def (major, minor, patch) = latestTag.replaceAll('v', '').tokenize('.')
+                
+                // Increment patch version
+                env.MAJOR = major
+                env.MINOR = minor
+                env.PATCH = (patch.toInteger() + 1).toString()
+                
+                // Create new version string
+                env.NEW_VERSION = "v${env.MAJOR}.${env.MINOR}.${env.PATCH}"
+                
+                // Reset the remote URL
+                sh "git remote set-url origin ${remoteUrl}"
             }
         }
-        
-        stage('Tag Commit') {
-            steps {
-                script {
-                    // Configure Git user (required for tagging)
-                    sh """
-                        git config user.email "jenkins@example.com"
-                        git config user.name "Jenkins"
-                    """
-                    
-                    // Create and push new tag
-                    sh """
-                        git tag -a ${env.NEW_VERSION} -m "Release ${env.NEW_VERSION}"
-                        git push origin ${env.NEW_VERSION}
-                    """
-                    
-                    echo "Successfully created and pushed tag: ${env.NEW_VERSION}"
-                }
+    }
+}
+
+stage('Tag Commit') {
+    steps {
+        script {
+            withCredentials([usernamePassword(credentialsId: 'github-token', 
+                                           usernameVariable: 'GITHUB_USER', 
+                                           passwordVariable: 'GITHUB_TOKEN')]) {
+                def remoteUrl = sh(script: 'git config --get remote.origin.url', returnStdout: true).trim()
+                def authenticatedUrl = remoteUrl.replaceFirst('https://', "https://${GITHUB_USER}:${GITHUB_TOKEN}@")
+                
+                // Configure Git user
+                sh """
+                    git config user.email "jenkins@example.com"
+                    git config user.name "Jenkins"
+                    git remote set-url origin ${authenticatedUrl}
+                    git tag -a ${env.NEW_VERSION} -m "Release ${env.NEW_VERSION}"
+                    git push origin ${env.NEW_VERSION}
+                """
+                
+                // Reset the remote URL
+                sh "git remote set-url origin ${remoteUrl}"
+                
+                echo "Successfully created and pushed tag: ${env.NEW_VERSION}"
             }
-        }       
+        }
+    }
+}
         stage('Initialize') {
             steps {
                 script {
