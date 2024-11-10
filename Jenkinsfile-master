@@ -199,9 +199,9 @@ pipeline {
                     }
                     steps {
                         script {
-                            echo "Building backend image version ${env.NEW_BACKEND_VERSION}..."
+                            echo 'Changes detected in the backend directory. Building backend image...'
                             sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/dockerfile ./app/backend"
-                            env.BUILD_BACKEND = 'true'
+                            env.BUILD_BACKEND = 'true' 
                         }
                     }
                 }
@@ -213,9 +213,14 @@ pipeline {
                     }
                     steps {
                         script {
-                            echo "Building frontend image version ${env.NEW_FRONTEND_VERSION}..."
-                            sh "docker build --build-arg REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"
-                            env.BUILD_FRONTEND = 'true'
+                            echo 'Changes detected in the frontend directory. Building frontend image...'
+                            sh """
+                                docker build \
+                                    --build-arg REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \
+                                    -t ${env.FRONTEND_IMAGE} \
+                                    -f ./app/frontend/dockerfile ./app/frontend
+                            """
+                            env.BUILD_FRONTEND = 'true' 
                         }
                     }
                 }
@@ -280,16 +285,15 @@ pipeline {
                             """
                         }
 
-                        // Always restart frontend with new version, even if only backend changed
+                        // Always restart frontend with new version
                         sh """
                         ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
                             sudo docker stop frontend || true && sudo docker rm frontend || true;
                             ${env.BUILD_FRONTEND == 'true' ? "sudo docker pull ${env.FRONTEND_IMAGE};" : ''}
-                            sudo docker run -d --name frontend -p 443:3002 \\
-                            -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \\
-                            -e REACT_APP_VERSION='${env.NEW_VERSION}' \\
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \\
-                            -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \\
+                            sudo docker run -d --name frontend -p 443:3002 \
+                            -e VERSION='${env.NEW_VERSION}' \
+                            -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
+                            -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
                             ${env.FRONTEND_IMAGE};
                         "
                         """
