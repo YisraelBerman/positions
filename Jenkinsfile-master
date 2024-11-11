@@ -11,6 +11,29 @@ pipeline {
     }
 
     stages {  
+        stage('Check Commit Message') {
+            steps {
+                script {
+                    // Get commit message and store it in env variable
+                    env.COMMIT_MESSAGE = sh(
+                        script: "git log -1 --pretty=%B",
+                        returnStdout: true
+                    ).trim().toLowerCase()
+                    
+                    // Check if commit message starts with any valid type
+                    def isValidMessage = ['breaking:', 'feat:', 'fix:'].any { type ->
+                        env.COMMIT_MESSAGE.startsWith(type)
+                    }
+                    
+                    if (!isValidMessage) {
+                        echo "Commit message '${env.COMMIT_MESSAGE}' doesn't start with breaking:, feat:, or fix:. Skipping pipeline."
+                        currentBuild.result = 'SUCCESS'
+                        sh 'exit 0'
+                    }
+                }
+            }
+        } // Check Commit Message
+
         stage('Initialize and Get Versions') {
             steps {
                 script {
@@ -28,10 +51,7 @@ pipeline {
                             ]]])
                     
                     // Get commit message
-                    def commitMessage = sh(
-                        script: "git log -1 --pretty=%B",
-                        returnStdout: true
-                    ).trim().toLowerCase()
+                    def commitMessage = env.COMMIT_MESSAGE
                     
                     // Get the latest tag
                     def latestTag = sh(
