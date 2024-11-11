@@ -216,7 +216,6 @@ if __name__ == '__main__':
     app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
     
    
-   
     # Local development settings (remove before pushing to production)
     #app.run(host='127.0.0.1', port=5000, debug=True)
     
