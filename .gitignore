@@ -57,3 +57,5 @@
 !.gitignore
 !README.md
 !**/README.md
+!updateroute53onboot.md
+!pipeline.drawio

@@ -69,8 +69,12 @@ Note: It may take up to 48 hours for these changes to propagate globally
 5. Click "Save"
 
 
-## Step 6: Create a Script to Update DNS
-
+## Step 6: Update DNS
+Two approuchs:
+### AWS CloudWatch and Lambda
+see: updateroute53onboot.md
+### Create a Script to Update DNS
+#### script:
 1. SSH into your EC2 instance
 2. Install AWS CLI
 3. Create a new file (e.g., `update_route53.sh`) with the following content:
@@ -97,28 +101,17 @@ aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --chang
     }]
 }'
 ```
-
+- add any needed commands on boot, like docker start.
 3. Replace `your-hosted-zone-id` with your actual Hosted Zone ID (found in the Route 53 console)
 4. Make the script executable: `chmod +x update_route53.sh`
 5. install aws cli on machine.
 
-## Step 7: Configure Instances to Run Script on Startup
+#### Configure Instances to Run Script on Startup
 
-1. Edit the `/etc/rc.local` file (create it if it doesn't exist):
-   ```
-   sudo nano /etc/rc.local
-   ```
-2. Add the following lines before the `exit 0` line:
-   ```
-   #!/bin/bash
-   /path/to/your/update_route53.sh
-   ```
-3. Make sure `/etc/rc.local` is executable:
-   ```
-   sudo chmod +x /etc/rc.local
-   ```
+Put the script in:
+/var/lib/cloud/scripts/per-boot/
 
-## Step 8: Set Up HTTPS
+## Step 7: Set Up HTTPS
 1. Create certs
 ```
 sudo apt-get update
@@ -142,7 +135,7 @@ Now configure your React app to use these certificates. The exact process will d
 certbot renew
 ```
 
-## Step 9: Test Your Setup
+## Step 8: Test Your Setup
 
 1. Restart your EC2 instances
 2. Check that the Route 53 A records have been updated with the new IP addresses
