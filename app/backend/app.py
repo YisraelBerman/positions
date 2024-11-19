@@ -10,13 +10,16 @@ import os
 import pandas as pd
 import traceback
 
+from config import volunteers_table, fence_points_table
+from boto3.dynamodb.conditions import Key, Attr
+
 app = Flask(__name__)
 
 
 #dev and prod:
-CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
+#CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
 #local:
-#CORS(app, origins=["http://localhost:3000"])
+CORS(app, origins=["http://localhost:3000"])
 
 app.config['TIMEZONE'] = pytz.UTC
 
@@ -34,38 +37,41 @@ fence_points_df = pd.read_csv('fence_points.csv', encoding='utf-8')
 fence_points_df['importance'] = pd.to_numeric(fence_points_df['importance'], errors='coerce').fillna(10)
 
 
-def redistribute_volunteers(volunteers_df, key_points):
+def redistribute_volunteers(volunteers, key_points):
     assignments = []
     assigned_volunteers = set()
 
     # Step 1: Determine how many key points can be staffed
-    num_volunteers = len(volunteers_df)
-    max_key_points = num_volunteers // 2  # Each key point should have at least 2 volunteers
-    sorted_key_points = key_points.sort_values(by='importance')
+    num_volunteers = len(volunteers)
+    max_key_points = num_volunteers // 2
+
+    # Sort key points by importance
+    sorted_key_points = sorted(key_points, key=lambda x: int(x['importance']))
 
     # Step 2: Determine which key points will be staffed
     if max_key_points < len(sorted_key_points):
-        # Only staff the top X most important key points
-        prioritized_key_points = sorted_key_points.head(max_key_points)
+        prioritized_key_points = sorted_key_points[:max_key_points]
     else:
-        # Staff all key points
         prioritized_key_points = sorted_key_points
 
     # Determine the base number of volunteers per key point
     extra_volunteers = num_volunteers - (base_volunteers_per_point * len(prioritized_key_points))
 
-    # Calculate the volunteers needed for each key point
-    volunteers_needed = {point_id: base_volunteers_per_point for point_id in prioritized_key_points['point_id']}
+    # Calculate volunteers needed for each key point
+    volunteers_needed = {int(point['point_id']): base_volunteers_per_point 
+                        for point in prioritized_key_points}
     
     # Distribute extra volunteers by importance
-    for point_id in prioritized_key_points['point_id']:
+    for point in prioritized_key_points:
+        point_id = int(point['point_id'])
         if extra_volunteers > 0:
             volunteers_needed[point_id] += 1
             extra_volunteers -= 1
 
-    # Step 3: Assign volunteers to key points by looping through key points
-    volunteer_assignments = {point_id: [] for point_id in prioritized_key_points['point_id']}
-    available_volunteers = volunteers_df.to_dict(orient='records')
+    # Step 3: Assign volunteers to key points
+    volunteer_assignments = {int(point['point_id']): [] 
+                           for point in prioritized_key_points}
+    available_volunteers = volunteers.copy()
 
     # Function to find the nearest available volunteer to a key point
     def find_closest_volunteer(key_point, available_volunteers):
@@ -74,19 +80,20 @@ def redistribute_volunteers(volunteers_df, key_points):
         for volunteer in available_volunteers:
             if volunteer['id'] in assigned_volunteers:
                 continue  # Skip already assigned volunteers
-            distance = circular_distance(key_point, volunteer['closest_point'])
+            distance = circular_distance(key_point, int(volunteer['closest_point']))
             if distance < min_distance:
                 min_distance = distance
                 closest_volunteer = volunteer
         return closest_volunteer
 
     # Loop through prioritized key points and assign the closest volunteers
-    for point_id in prioritized_key_points['point_id']:
+    for point in prioritized_key_points:
+        point_id = int(point['point_id'])
         while len(volunteer_assignments[point_id]) < volunteers_needed[point_id]:
             closest_volunteer = find_closest_volunteer(point_id, available_volunteers)
             if closest_volunteer:
                 volunteer_assignments[point_id].append(closest_volunteer)
-                assigned_volunteers.add(closest_volunteer['id'])
+                assigned_volunteers.add(int(closest_volunteer['id']))
                 available_volunteers.remove(closest_volunteer)
             else:
                 break  # No more available volunteers
@@ -94,13 +101,16 @@ def redistribute_volunteers(volunteers_df, key_points):
     # Convert assignment dictionary to a list of assignments
     assignments = [
         {
-            'key_point': int(point_id),
-            'importance': int(prioritized_key_points[prioritized_key_points['point_id'] == point_id]['importance'].values[0]),
+            'key_point': point_id,
+            'importance': next(int(p['importance']) for p in prioritized_key_points 
+                             if int(p['point_id']) == point_id),
             'volunteers': [v['name'] for v in volunteers]
-        } for point_id, volunteers in volunteer_assignments.items() if volunteers
+        } 
+        for point_id, volunteers in volunteer_assignments.items() 
+        if volunteers
     ]
 
-    return assignments, assigned_volunteers
+    return assignments
 
 # Helper function for circular distance
 def circular_distance(p1, p2):
@@ -110,45 +120,59 @@ def circular_distance(p1, p2):
     return min(forward, backward)
 
 def assign_volunteers():
-    # Step 1: Filter available volunteers
-    available_volunteers = volunteers_df[volunteers_df['available'] == True]
+    try:
+        # Get available volunteers
+        response = volunteers_table.scan(
+            FilterExpression=Attr('available').eq(True)
+        )
+        available_volunteers = response['Items']
 
-    # Step 2: Get the sorted key points
-    key_points = fence_points_df[fence_points_df['point_id'].isin(key_points_list)]
+        # Get key points
+        response = fence_points_table.scan(
+            FilterExpression=Attr('point_id').is_in(key_points_list)
+        )
+        key_points = response['Items']
 
-    # Step 3: Redistribute volunteers and create assignments
-    assignments, assigned_volunteers = redistribute_volunteers(available_volunteers, key_points)
-
-    # Step 4: Handle any remaining unassigned volunteers if any
-    unassigned_volunteers = available_volunteers[~available_volunteers['id'].isin(assigned_volunteers)]
-    if not unassigned_volunteers.empty:
-        print("Warning: Some volunteers were not assigned.")
-        print("Unassigned volunteers:", unassigned_volunteers.to_dict(orient='records'))
-
-    return assignments
+        # Create assignments
+        assignments = redistribute_volunteers(available_volunteers, key_points)
+        
+        # Log for debugging
+        print(f"Found {len(available_volunteers)} available volunteers")
+        print(f"Found {len(key_points)} key points")
+        print(f"Created {len(assignments)} assignments")
+        
+        return assignments
+        
+    except Exception as e:
+        print(f"Error in assign_volunteers: {str(e)}")
+        print("Available volunteers:", available_volunteers)
+        print("Key points:", key_points)
+        raise
 
 @app.route('/api/volunteers', methods=['GET'])
 def get_volunteers():
-    return jsonify(volunteers_df.to_dict(orient='records'))
+    response = volunteers_table.scan()
+    return jsonify(response['Items'])
 
 @app.route('/api/update_status', methods=['POST'])
 def update_status():
-    global volunteers_df
-
     data = request.json
-    volunteer_id = data['id']
-    available = data['available']
+    volunteer_id = int(data['id'])
+    available = bool(data['available'])
 
     print(f"Received request to update volunteer {volunteer_id} availability to {available}")
 
-    if volunteer_id in volunteers_df['id'].values:
-        volunteers_df.loc[volunteers_df['id'] == volunteer_id, 'available'] = available
-        volunteers_df.to_csv('volunteers.csv', index=False)
-        volunteers_df = pd.read_csv('volunteers.csv')
+    try:
+        response = volunteers_table.update_item(
+            Key={'id': volunteer_id},
+            UpdateExpression='SET available = :val',
+            ExpressionAttributeValues={':val': available},
+            ReturnValues='UPDATED_NEW'
+        )
         print("Volunteer status updated successfully.")
         return jsonify({'status': 'success', 'message': 'Volunteer status updated.'})
-    else:
-        print("Volunteer not found.")
+    except Exception as e:
+        print(f"Error updating volunteer: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Volunteer not found.'}), 404
 
 # עמדות
@@ -160,16 +184,22 @@ def get_assignments():
 # שכונות
 @app.route('/api/locations', methods=['GET'])
 def get_locations():
-    # Filter volunteers to include only those who are available
-    available_volunteers_df = volunteers_df[volunteers_df['available'] == True]
+    # Get available volunteers from DynamoDB
+    response = volunteers_table.scan(
+        FilterExpression=Attr('available').eq(True)
+    )
+    available_volunteers = response['Items']
 
-    # Group available volunteers by location
-    grouped = available_volunteers_df.groupby('location')['name'].apply(list).reset_index()
+    # Group volunteers by location
+    location_groups = {}
+    for volunteer in available_volunteers:
+        location = volunteer['location']
+        if location not in location_groups:
+            location_groups[location] = []
+        location_groups[location].append(volunteer['name'])
+
     locations = []
-
-    for _, row in grouped.iterrows():
-        location_name = row['location']
-        volunteers = row['name']
+    for location_name, volunteers in location_groups.items():
         total_volunteers = len(volunteers)
 
         if total_volunteers == 0:
@@ -183,8 +213,7 @@ def get_locations():
             })
             continue
 
-        # Calculate number of groups based on total volunteers
-        # If volunteers >= 2 * GROUP_SIZE, split into multiple groups
+        # Calculate number of groups
         if total_volunteers >= 2 * GROUP_SIZE:
             num_groups = total_volunteers // GROUP_SIZE
         else:
@@ -209,16 +238,15 @@ def get_locations():
     return jsonify(locations)
 
 
-
 if __name__ == '__main__':
     
     # Dev and Production settings (commented out during local testing)
-    app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
+    #app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
     
    
 
     # Local development settings (remove before pushing to production)
-    #app.run(host='127.0.0.1', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=5000, debug=True)
     
     
     app.config['TIMEZONE'] = pytz.UTC
