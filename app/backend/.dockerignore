@@ -7,6 +7,8 @@ venv/
 .idea/
 .vscode/
 
+.env
+
 
 
 # Ignore any other unnecessary files or directories

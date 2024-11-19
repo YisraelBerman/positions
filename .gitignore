@@ -24,8 +24,8 @@
 !/app/backend/.dockerignore
 
 # DB files
-!/app/backend/fence_points.csv
-!/app/backend/volunteers.csv
+#!/app/backend/fence_points.csv
+#!/app/backend/volunteers.csv
 
 # Allow specific frontend files
 !/app/frontend/dockerfile
