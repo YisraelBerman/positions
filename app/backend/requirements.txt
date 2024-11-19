@@ -1,7 +1,6 @@
 flask
 flask-cors
-pandas
 pytz
 requests
 boto3
-python-dotenv
+gunicorn

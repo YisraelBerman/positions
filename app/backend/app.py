@@ -32,9 +32,9 @@ base_volunteers_per_point = 2
 GROUP_SIZE = 3 
 
 # Load data from CSV files
-volunteers_df = pd.read_csv('volunteers.csv', encoding='utf-8')
-fence_points_df = pd.read_csv('fence_points.csv', encoding='utf-8')
-fence_points_df['importance'] = pd.to_numeric(fence_points_df['importance'], errors='coerce').fillna(10)
+# volunteers_df = pd.read_csv('volunteers.csv', encoding='utf-8')
+# fence_points_df = pd.read_csv('fence_points.csv', encoding='utf-8')
+# fence_points_df['importance'] = pd.to_numeric(fence_points_df['importance'], errors='coerce').fillna(10)
 
 
 def redistribute_volunteers(volunteers, key_points):
