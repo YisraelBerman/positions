@@ -17,9 +17,9 @@ app = Flask(__name__)
 
 
 #dev and prod:
-#CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
+CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
 #local:
-CORS(app, origins=["http://localhost:3000"])
+#CORS(app, origins=["http://localhost:3000"])
 
 app.config['TIMEZONE'] = pytz.UTC
 
@@ -241,12 +241,12 @@ def get_locations():
 if __name__ == '__main__':
     
     # Dev and Production settings (commented out during local testing)
-    #app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
+    app.run(ssl_context=('/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem', '/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem'))
     
    
 
     # Local development settings (remove before pushing to production)
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    #app.run(host='127.0.0.1', port=5000, debug=True)
     
     
     app.config['TIMEZONE'] = pytz.UTC
