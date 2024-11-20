@@ -43,7 +43,7 @@ def redistribute_volunteers(volunteers, key_points):
 
     # Step 1: Determine how many key points can be staffed
     num_volunteers = len(volunteers)
-    max_key_points = num_volunteers // 2
+    max_key_points = num_volunteers // base_volunteers_per_point
 
     # Sort key points by importance
     sorted_key_points = sorted(key_points, key=lambda x: int(x['importance']))
