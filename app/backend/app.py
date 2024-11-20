@@ -40,7 +40,7 @@ def redistribute_volunteers(volunteers_df, key_points):
 
     # Step 1: Determine how many key points can be staffed
     num_volunteers = len(volunteers_df)
-    max_key_points = num_volunteers // 2  # Each key point should have at least 2 volunteers
+    max_key_points = num_volunteers // base_volunteers_per_point
     sorted_key_points = key_points.sort_values(by='importance')
 
     # Step 2: Determine which key points will be staffed
