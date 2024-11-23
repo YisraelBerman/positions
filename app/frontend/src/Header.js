@@ -8,13 +8,14 @@ function Header() {
     padding: '10px 20px',
     borderBottom: '2px solid #ddd',
     marginBottom: '20px',
+    backgroundColor: '#A9A9A9',
   };
 
   const buttonStyle = {
     padding: '10px 20px',
     margin: '0 5px',
     border: '1px solid #ddd',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     cursor: 'pointer',
   };
 

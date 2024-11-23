@@ -18,13 +18,14 @@
 
 # Allow specific backend files
 !/app/backend/app.py
+!/app/backend/config.py
 !/app/backend/requirements.txt
 !/app/backend/dockerfile
 !/app/backend/.dockerignore
 
 # DB files
-!/app/backend/fence_points.csv
-!/app/backend/volunteers.csv
+#!/app/backend/fence_points.csv
+#!/app/backend/volunteers.csv
 
 # Allow specific frontend files
 !/app/frontend/dockerfile
@@ -54,8 +55,10 @@
 /app/backend/venv/
 
 
+# Allow docs
 !.gitignore
 !README.md
 !**/README.md
 !updateroute53onboot.md
 !pipeline.drawio
+!/app/backend/env-example

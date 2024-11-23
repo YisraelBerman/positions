@@ -1,6 +1,7 @@
 flask
 flask-cors
 pandas
-flask-jwt-extended
 pytz
 requests
+boto3
+gunicorn
