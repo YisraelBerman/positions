@@ -92,6 +92,7 @@ const mainPageStyle = {
   flexDirection: 'column',
   alignItems: 'center',
   padding: '20px',
+  marginBottom: '80px',
 };
 
 const contentStyle = {
@@ -109,6 +110,7 @@ const sectionStyle = {
   margin: '0 10px',
   borderRadius: '8px',
   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+  backgroundColor: 'white',
 };
 
 export default App;
