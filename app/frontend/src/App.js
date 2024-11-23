@@ -92,7 +92,10 @@ const mainPageStyle = {
   flexDirection: 'column',
   alignItems: 'center',
   padding: '20px',
-  marginBottom: '80px',
+  marginBottom: '100px',
+  maxWidth: '1200px',  
+  margin: '0 auto',    
+  width: '100%'
 };
 
 const contentStyle = {
