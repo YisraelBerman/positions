@@ -19,7 +19,7 @@ app = Flask(__name__)
 #dev and prod:
 CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGIN', 'https://app.yisraelberman.com')}})
 #local:
-#CORS(app, origins=["http://localhost:3000"])
+#CORS(app, origins=["http://localhost:3000","http://localhost:3001"])
 
 app.config['TIMEZONE'] = pytz.UTC
 

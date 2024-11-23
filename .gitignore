@@ -7,14 +7,12 @@
 !/.github/workflows
 !/.github/workflows/trigger_jenkins_mail.yml
 
-#Allow docker-compose
-!/app/docker-compose.yaml
-!/app/remote_docker_compose.yaml
 
 # Allow specific backend and frontend directories
 !/app/
 !/app/backend/
 !/app/frontend/
+!/app/admin-frontend/
 
 # Allow specific backend files
 !/app/backend/app.py
@@ -45,14 +43,30 @@
 !/app/frontend/src/*.html
 !/app/frontend/src/*.css
 
-# # allow Keycloak files
-# !/app/keycloak/
-# !/app/keycloak/docker-compose.yml
-
 
 # Exclude common files and directories that should remain ignored
 /app/frontend/node_modules/
 /app/backend/venv/
+/app/admin-frontend/node_modules/
+
+
+# Allow specific subdirectories in frontend
+!/app/admin-frontend/public/
+!/app/admin-frontend/src/
+
+# Allow .js, .html, .css files inside specific admin-frontend subdirectories
+!/app/admin-frontend/public/*.js
+!/app/admin-frontend/public/*.html
+!/app/admin-frontend/public/*.css
+!/app/admin-frontend/src/*.js
+!/app/admin-frontend/src/*.html
+!/app/admin-frontend/src/*.css
+
+# Allow certain admin-frontend files
+!/app/admin-frontend/src/components/ui/alert.jsx
+!/app/admin-frontend/src/lib/utils.js
+!app/admin-frontend/tailwind.config.js
+!app/admin-frontend/postcss.config.js
 
 
 # Allow docs
