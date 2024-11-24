@@ -49,6 +49,10 @@
 /app/backend/venv/
 /app/admin-frontend/node_modules/
 
+# Allow specific admin-frontend files
+!/app/admin-frontend/dockerfile
+!/app/admin-frontend/.dockerignore
+!/app/admin-frontend/package.json
 
 # Allow specific subdirectories in frontend
 !/app/admin-frontend/public/

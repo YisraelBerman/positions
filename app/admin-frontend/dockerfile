@@ -1,0 +1,44 @@
+# Use an official Node.js runtime as a parent image
+FROM node:18-alpine
+
+# Set the working directory
+WORKDIR /app/admin-frontend
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Install serve globally
+RUN npm install -g serve
+
+# Copy all application files
+COPY . .
+
+# Set environment variables
+ENV PORT=3001
+ARG REACT_APP_API_BASE_URL
+ENV REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL
+
+# Build the app
+RUN npm run build
+
+# Expose the port
+EXPOSE 3001
+
+# Start the app using serve
+CMD ["serve", "-s", "build", "--ssl-cert", "/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem", "--ssl-key", "/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem", "--listen", "3001"]
+
+
+
+
+# Build the image
+docker build \
+  --build-arg REACT_APP_API_BASE_URL=https://app.yisraelberman.com/api \
+  -t volunteer-admin:production .
+
+# Run the container
+docker run -d \
+  -p 3001:3001 \
+  -v /etc/letsencrypt:/etc/letsencrypt:ro \
+  --name volunteer-admin \
+  volunteer-admin:production
