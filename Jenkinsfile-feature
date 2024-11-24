@@ -127,63 +127,41 @@ pipeline {
             }
         } //Start AWS EC2 Instance       
         
+        stages {
         stage('Initialize') {
             steps {
                 script {
-                    // Define services configuration
-                    def services = [
-                        [
-                            name: 'backend',
-                            directory: 'app/backend',
-                            port: '5000',
-                            envFile: '~/backend/.env',
-                            extraEnv: [
-                                'FLASK_ENV=production',
-                                'CORS_ORIGIN=https://app-dev.yisraelberman.com'
-                            ],
-                            buildArgs: []
-                        ],
-                        [
-                            name: 'frontend',
-                            directory: 'app/frontend',
-                            port: '443:3002',
-                            envFile: '',
-                            extraEnv: [
-                                'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
-                            ],
-                            buildArgs: [
-                                'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
-                            ]
-                        ]
-                        // Add new services here following the same pattern
-                        //[
-                        //    name: 'newservice',
-                        //    directory: 'app/newservice',
-                        //    port: '8080:8080',
-                        //    envFile: '~/newservice/.env',
-                        //    extraEnv: [
-                        //        'ENV_VAR1=value1',
-                        //        'ENV_VAR2=value2'
-                        //    ],
-                        //    buildArgs: [
-                        //        'BUILD_ARG1=value1'
-                        //   ]
-                        //]
-                    ]
+                    // Define services using environment variables
+                    // Service names
+                    env.SERVICE_NAMES = 'backend frontend'
                     
-                    // Store services in environment for use in other stages
-                    env.SERVICES = groovy.json.JsonOutput.toJson(services)
+                    // Backend configuration
+                    env.BACKEND_DIRECTORY = 'app/backend'
+                    env.BACKEND_PORT = '5000'
+                    env.BACKEND_ENV_FILE = '~/backend/.env'
+                    env.BACKEND_EXTRA_ENV = 'FLASK_ENV=production CORS_ORIGIN=https://app-dev.yisraelberman.com'
+                    env.BACKEND_BUILD_ARGS = ''
                     
-                    // Fetch git information
+                    // Frontend configuration
+                    env.FRONTEND_DIRECTORY = 'app/frontend'
+                    env.FRONTEND_PORT = '443:3002'
+                    env.FRONTEND_ENV_FILE = ''
+                    env.FRONTEND_EXTRA_ENV = 'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
+                    env.FRONTEND_BUILD_ARGS = 'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
+                    
+                    // Initialize build flags
+                    SERVICE_NAMES.split().each { service ->
+                        env["BUILD_${service.toUpperCase()}"] = 'false'
+                    }
+                    
+                    // Git information
                     env.GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
                     env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
                     def branchName = env.BRANCH_NAME.replaceAll('/', '-')
                     
-                    // Initialize service-specific variables
-                    def servicesConfig = readJSON text: env.SERVICES
-                    servicesConfig.each { service ->
-                        env["${service.name.toUpperCase()}_IMAGE"] = "${REPO_BASE_PATH}/${service.name}:${branchName}-build-${BUILD_NUMBER}"
-                        env["BUILD_${service.name.toUpperCase()}"] = 'false'
+                    // Set image names
+                    SERVICE_NAMES.split().each { service ->
+                        env["${service.toUpperCase()}_IMAGE"] = "${REPO_BASE_PATH}/${service}:${branchName}-build-${BUILD_NUMBER}"
                     }
                 }
             }
@@ -199,15 +177,15 @@ pipeline {
         stage('Check for Changes') {
             steps {
                 script {
-                    def servicesConfig = readJSON text: env.SERVICES
-                    servicesConfig.each { service ->
+                    SERVICE_NAMES.split().each { service ->
+                        def directory = env["${service.toUpperCase()}_DIRECTORY"]
                         def changes = sh(
-                            script: "git diff --name-only HEAD~1..HEAD | grep '${service.directory}/' || true",
+                            script: "git diff --name-only HEAD~1..HEAD | grep '${directory}/' || true",
                             returnStdout: true
                         ).trim()
                         
-                        env["${service.name.toUpperCase()}_CHANGED"] = changes ? 'true' : 'false'
-                        echo "${service.name} Changed: ${env["${service.name.toUpperCase()}_CHANGED"]}"
+                        env["${service.toUpperCase()}_CHANGED"] = changes ? 'true' : 'false'
+                        echo "${service} Changed: ${env["${service.toUpperCase()}_CHANGED"]}"
                     }
                 }
             }
@@ -216,18 +194,19 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    def servicesConfig = readJSON text: env.SERVICES
-                    servicesConfig.each { service ->
-                        if (env["${service.name.toUpperCase()}_CHANGED"] == 'true') {
-                            echo "Changes detected in ${service.name}. Building image..."
-                            def buildArgs = service.buildArgs.collect { arg -> "--build-arg ${arg}" }.join(' ')
+                    SERVICE_NAMES.split().each { service ->
+                        if (env["${service.toUpperCase()}_CHANGED"] == 'true') {
+                            echo "Changes detected in ${service}. Building image..."
+                            def buildArgs = env["${service.toUpperCase()}_BUILD_ARGS"]
+                            def buildArgsStr = buildArgs ? buildArgs.split().collect { "--build-arg ${it}" }.join(' ') : ''
+                            
                             sh """
-                                docker build ${buildArgs} \
-                                -t ${env["${service.name.toUpperCase()}_IMAGE"]} \
-                                -f ./${service.directory}/dockerfile \
-                                ./${service.directory}
+                                docker build ${buildArgsStr} \
+                                -t ${env["${service.toUpperCase()}_IMAGE"]} \
+                                -f ./${env["${service.toUpperCase()}_DIRECTORY"]}/dockerfile \
+                                ./${env["${service.toUpperCase()}_DIRECTORY"]}
                             """
-                            env["BUILD_${service.name.toUpperCase()}"] = 'true'
+                            env["BUILD_${service.toUpperCase()}"] = 'true'
                         }
                     }
                 }
@@ -237,9 +216,8 @@ pipeline {
         stage('Docker Login') {
             when {
                 expression { 
-                    def servicesConfig = readJSON text: env.SERVICES
-                    return servicesConfig.any { service ->
-                        env["BUILD_${service.name.toUpperCase()}"] == 'true'
+                    return SERVICE_NAMES.split().any { service ->
+                        env["BUILD_${service.toUpperCase()}"] == 'true'
                     }
                 }
             }
@@ -251,11 +229,10 @@ pipeline {
         stage('Push Images') {
             steps {
                 script {
-                    def servicesConfig = readJSON text: env.SERVICES
-                    servicesConfig.each { service ->
-                        if (env["BUILD_${service.name.toUpperCase()}"] == 'true') {
-                            echo "Pushing ${service.name} image to GitHub..."
-                            sh "docker push ${env["${service.name.toUpperCase()}_IMAGE"]}"
+                    SERVICE_NAMES.split().each { service ->
+                        if (env["BUILD_${service.toUpperCase()}"] == 'true') {
+                            echo "Pushing ${service} image to GitHub..."
+                            sh "docker push ${env["${service.toUpperCase()}_IMAGE"]}"
                         }
                     }
                 }
@@ -265,35 +242,35 @@ pipeline {
         stage('Deploy') {
             when {
                 expression { 
-                    def servicesConfig = readJSON text: env.SERVICES
-                    return servicesConfig.any { service ->
-                        env["BUILD_${service.name.toUpperCase()}"] == 'true'
+                    return SERVICE_NAMES.split().any { service ->
+                        env["BUILD_${service.toUpperCase()}"] == 'true'
                     }
                 }
             }
             steps {
                 script {
-                    def servicesConfig = readJSON text: env.SERVICES
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
                         withEnv(["SSH_KEY_PATH=$secret"]) {
-                            servicesConfig.each { service ->
-                                if (env["BUILD_${service.name.toUpperCase()}"] == 'true') {
-                                    echo "Deploying ${service.name}..."
-                                    def envFile = service.envFile ? "--env-file ${service.envFile}" : ''
-                                    def extraEnv = service.extraEnv.collect { "-e ${it}" }.join(' ')
+                            SERVICE_NAMES.split().each { service ->
+                                if (env["BUILD_${service.toUpperCase()}"] == 'true') {
+                                    echo "Deploying ${service}..."
+                                    def envFile = env["${service.toUpperCase()}_ENV_FILE"]
+                                    def envFileStr = envFile ? "--env-file ${envFile}" : ''
+                                    def extraEnv = env["${service.toUpperCase()}_EXTRA_ENV"]
+                                    def extraEnvStr = extraEnv ? extraEnv.split().collect { "-e ${it}" }.join(' ') : ''
                                     
                                     sh """
                                         ssh -o StrictHostKeyChecking=no -i "\$SSH_KEY_PATH" \${SSH_TARGET} "
-                                            sudo docker stop ${service.name} || true && \
-                                            sudo docker rm ${service.name} || true && \
-                                            sudo docker pull ${env["${service.name.toUpperCase()}_IMAGE"]} && \
-                                            sudo docker run -d --name ${service.name} \
-                                            -p ${service.port} \
-                                            ${envFile} \
-                                            ${extraEnv} \
+                                            sudo docker stop ${service} || true && \
+                                            sudo docker rm ${service} || true && \
+                                            sudo docker pull ${env["${service.toUpperCase()}_IMAGE"]} && \
+                                            sudo docker run -d --name ${service} \
+                                            -p ${env["${service.toUpperCase()}_PORT"]} \
+                                            ${envFileStr} \
+                                            ${extraEnvStr} \
                                             -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
                                             -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
-                                            ${env["${service.name.toUpperCase()}_IMAGE"]}
+                                            ${env["${service.toUpperCase()}_IMAGE"]}
                                         "
                                     """
                                 }
