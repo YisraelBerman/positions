@@ -13,32 +13,7 @@ pipeline {
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key') // AWS Secret Key from Jenkins Credentials
         
         REPO_BASE_PATH = "ghcr.io/yisraelberman/positions"
-        SERVICES = [
-            [
-                name: 'backend',
-                directory: 'app/backend',
-                port: '5000',
-                envFile: '~/backend/.env',
-                extraEnv: [
-                    'FLASK_ENV=production',
-                    'CORS_ORIGIN=https://app-dev.yisraelberman.com'
-                ],
-                buildArgs: []
-            ],
-            [
-                name: 'frontend',
-                directory: 'app/frontend',
-                port: '443:3002',
-                envFile: '',
-                extraEnv: [
-                    'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
-                ],
-                buildArgs: [
-                    'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
-                ]
-            ]
-            // Add new services here following the same pattern
-        ]
+        
     }
 
 
@@ -155,17 +130,59 @@ pipeline {
         stage('Initialize') {
             steps {
                 script {
+                    // Define services configuration
+                    def services = [
+                        [
+                            name: 'backend',
+                            directory: 'app/backend',
+                            port: '5000',
+                            envFile: '~/backend/.env',
+                            extraEnv: [
+                                'FLASK_ENV=production',
+                                'CORS_ORIGIN=https://app-dev.yisraelberman.com'
+                            ],
+                            buildArgs: []
+                        ],
+                        [
+                            name: 'frontend',
+                            directory: 'app/frontend',
+                            port: '443:3002',
+                            envFile: '',
+                            extraEnv: [
+                                'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
+                            ],
+                            buildArgs: [
+                                'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
+                            ]
+                        ]
+                        // Add new services here following the same pattern
+                        //[
+                        //    name: 'newservice',
+                        //    directory: 'app/newservice',
+                        //    port: '8080:8080',
+                        //    envFile: '~/newservice/.env',
+                        //    extraEnv: [
+                        //        'ENV_VAR1=value1',
+                        //        'ENV_VAR2=value2'
+                        //    ],
+                        //    buildArgs: [
+                        //        'BUILD_ARG1=value1'
+                        //   ]
+                        //]
+                    ]
+                    
+                    // Store services in environment for use in other stages
+                    env.SERVICES = groovy.json.JsonOutput.toJson(services)
+                    
                     // Fetch git information
                     env.GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
                     env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
-                    
                     def branchName = env.BRANCH_NAME.replaceAll('/', '-')
                     
                     // Initialize service-specific variables
-                    SERVICES.each { service ->
-                        // Create image name for each service
+                    def servicesConfig = readJSON text: env.SERVICES
+                    servicesConfig.each { service ->
                         env["${service.name.toUpperCase()}_IMAGE"] = "${REPO_BASE_PATH}/${service.name}:${branchName}-build-${BUILD_NUMBER}"
-                        // Initialize build flags
                         env["BUILD_${service.name.toUpperCase()}"] = 'false'
                     }
                 }
@@ -182,7 +199,8 @@ pipeline {
         stage('Check for Changes') {
             steps {
                 script {
-                    SERVICES.each { service ->
+                    def servicesConfig = readJSON text: env.SERVICES
+                    servicesConfig.each { service ->
                         def changes = sh(
                             script: "git diff --name-only HEAD~1..HEAD | grep '${service.directory}/' || true",
                             returnStdout: true
@@ -198,7 +216,8 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    SERVICES.each { service ->
+                    def servicesConfig = readJSON text: env.SERVICES
+                    servicesConfig.each { service ->
                         if (env["${service.name.toUpperCase()}_CHANGED"] == 'true') {
                             echo "Changes detected in ${service.name}. Building image..."
                             def buildArgs = service.buildArgs.collect { arg -> "--build-arg ${arg}" }.join(' ')
@@ -218,7 +237,8 @@ pipeline {
         stage('Docker Login') {
             when {
                 expression { 
-                    return SERVICES.any { service ->
+                    def servicesConfig = readJSON text: env.SERVICES
+                    return servicesConfig.any { service ->
                         env["BUILD_${service.name.toUpperCase()}"] == 'true'
                     }
                 }
@@ -231,7 +251,8 @@ pipeline {
         stage('Push Images') {
             steps {
                 script {
-                    SERVICES.each { service ->
+                    def servicesConfig = readJSON text: env.SERVICES
+                    servicesConfig.each { service ->
                         if (env["BUILD_${service.name.toUpperCase()}"] == 'true') {
                             echo "Pushing ${service.name} image to GitHub..."
                             sh "docker push ${env["${service.name.toUpperCase()}_IMAGE"]}"
@@ -244,16 +265,18 @@ pipeline {
         stage('Deploy') {
             when {
                 expression { 
-                    return SERVICES.any { service ->
+                    def servicesConfig = readJSON text: env.SERVICES
+                    return servicesConfig.any { service ->
                         env["BUILD_${service.name.toUpperCase()}"] == 'true'
                     }
                 }
             }
             steps {
                 script {
+                    def servicesConfig = readJSON text: env.SERVICES
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
                         withEnv(["SSH_KEY_PATH=$secret"]) {
-                            SERVICES.each { service ->
+                            servicesConfig.each { service ->
                                 if (env["BUILD_${service.name.toUpperCase()}"] == 'true') {
                                     echo "Deploying ${service.name}..."
                                     def envFile = service.envFile ? "--env-file ${service.envFile}" : ''
