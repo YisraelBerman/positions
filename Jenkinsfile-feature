@@ -11,6 +11,34 @@ pipeline {
         AWS_REGION = 'us-east-1' 
         AWS_ACCESS_KEY_ID = credentials('aws-access-key') // AWS Access Key from Jenkins Credentials
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key') // AWS Secret Key from Jenkins Credentials
+        
+        REPO_BASE_PATH = "ghcr.io/yisraelberman/positions"
+        SERVICES = [
+            [
+                name: 'backend',
+                directory: 'app/backend',
+                port: '5000',
+                envFile: '~/backend/.env',
+                extraEnv: [
+                    'FLASK_ENV=production',
+                    'CORS_ORIGIN=https://app-dev.yisraelberman.com'
+                ],
+                buildArgs: []
+            ],
+            [
+                name: 'frontend',
+                directory: 'app/frontend',
+                port: '443:3002',
+                envFile: '',
+                extraEnv: [
+                    'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
+                ],
+                buildArgs: [
+                    'REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000'
+                ]
+            ]
+            // Add new services here following the same pattern
+        ]
     }
 
 
@@ -127,24 +155,19 @@ pipeline {
         stage('Initialize') {
             steps {
                 script {
-                    // Fetch the full commit hash
+                    // Fetch git information
                     env.GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
-                    
-                    // Extract the short commit hash
                     env.SHORT_COMMIT = env.GIT_COMMIT_HASH.substring(0, 7)
                     
-                    // Get repository name from git remote URL
-                    env.REPO_PATH = "ghcr.io/yisraelberman/positions"
-
-                    // Define image names with repository path
                     def branchName = env.BRANCH_NAME.replaceAll('/', '-')
-                    env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:${branchName}-build-${BUILD_NUMBER}"
-                    env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${branchName}-build-${BUILD_NUMBER}"
                     
-                    
-                    // Initialize flags
-                    env.BUILD_BACKEND = 'false'
-                    env.BUILD_FRONTEND = 'false'
+                    // Initialize service-specific variables
+                    SERVICES.each { service ->
+                        // Create image name for each service
+                        env["${service.name.toUpperCase()}_IMAGE"] = "${REPO_BASE_PATH}/${service.name}:${branchName}-build-${BUILD_NUMBER}"
+                        // Initialize build flags
+                        env["BUILD_${service.name.toUpperCase()}"] = 'false'
+                    }
                 }
             }
         } // Initialize
@@ -155,140 +178,102 @@ pipeline {
                 echo 'To be added someday.'
             }
         } // test
+
         stage('Check for Changes') {
             steps {
                 script {
-                    def backendChanges = sh(
-                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/backend/" || true',
-                        returnStdout: true
-                    ).trim()
-
-                    def frontendChanges = sh(
-                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/frontend/" || true',
-                        returnStdout: true
-                    ).trim()
-
-                    env.BACKEND_CHANGED = backendChanges ? 'true' : 'false'
-                    env.FRONTEND_CHANGED = frontendChanges ? 'true' : 'false'
-
-                    echo "Backend Changed: ${env.BACKEND_CHANGED}"
-                    echo "Frontend Changed: ${env.FRONTEND_CHANGED}"
+                    SERVICES.each { service ->
+                        def changes = sh(
+                            script: "git diff --name-only HEAD~1..HEAD | grep '${service.directory}/' || true",
+                            returnStdout: true
+                        ).trim()
+                        
+                        env["${service.name.toUpperCase()}_CHANGED"] = changes ? 'true' : 'false'
+                        echo "${service.name} Changed: ${env["${service.name.toUpperCase()}_CHANGED"]}"
+                    }
                 }
             }
         } //Check for Changes
+
         stage('Build') {
-            parallel {
-                stage('Build Backend') {
-                    when {
-                        expression {
-                            return env.BACKEND_CHANGED == 'true'
+            steps {
+                script {
+                    SERVICES.each { service ->
+                        if (env["${service.name.toUpperCase()}_CHANGED"] == 'true') {
+                            echo "Changes detected in ${service.name}. Building image..."
+                            def buildArgs = service.buildArgs.collect { arg -> "--build-arg ${arg}" }.join(' ')
+                            sh """
+                                docker build ${buildArgs} \
+                                -t ${env["${service.name.toUpperCase()}_IMAGE"]} \
+                                -f ./${service.directory}/dockerfile \
+                                ./${service.directory}
+                            """
+                            env["BUILD_${service.name.toUpperCase()}"] = 'true'
                         }
                     }
-                    steps {
-                        script {
-                            echo 'Changes detected in the backend directory. Building backend image...'
-                            sh "docker build -t ${env.BACKEND_IMAGE} -f ./app/backend/dockerfile ./app/backend"
-                            env.BUILD_BACKEND = 'true' 
-                        }
-                    }
-                } // Build Backend
-                stage('Build Frontend') {
-                    when {
-                        expression {
-                            return env.FRONTEND_CHANGED == 'true'
-                        }
-                    }
-                    steps {
-                        script {
-                            echo 'Changes detected in the frontend directory. Building frontend image...'
-                            sh "docker build --build-arg REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000 -t ${env.FRONTEND_IMAGE} -f ./app/frontend/dockerfile ./app/frontend"                            
-                            env.BUILD_FRONTEND = 'true' 
-                        }
-                    }
-                } // Build Frontend
+                }
             }
         } // Build
 
         stage('Docker Login') {
             when {
-                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
+                expression { 
+                    return SERVICES.any { service ->
+                        env["BUILD_${service.name.toUpperCase()}"] == 'true'
+                    }
+                }
             }
             steps {
                 sh "echo ${env.GITHUB_TOKEN} | docker login ghcr.io -u ${env.GITHUB_USER} --password-stdin"
             }
         } // Docker Login
 
-        stage('Push Images to GitHub') {
-            parallel {
-                stage('Push Backend Image') {
-                    when {
-                        expression { return env.BUILD_BACKEND == 'true' }
-                    }
-                    steps {
-                        script {
-                            echo 'Pushing backend image to GitHub...'
-                            sh """
-                                docker push ${env.BACKEND_IMAGE}
-                            """
-                        }
-                    }
-                }
-                stage('Push Frontend Image') {
-                    when {
-                        expression { return env.BUILD_FRONTEND == 'true' }
-                    }
-                    steps {
-                        script {
-                            echo 'Pushing frontend image to GitHub...'
-                            sh """
-                                docker push ${env.FRONTEND_IMAGE}
-                            """
+        stage('Push Images') {
+            steps {
+                script {
+                    SERVICES.each { service ->
+                        if (env["BUILD_${service.name.toUpperCase()}"] == 'true') {
+                            echo "Pushing ${service.name} image to GitHub..."
+                            sh "docker push ${env["${service.name.toUpperCase()}_IMAGE"]}"
                         }
                     }
                 }
             }
         } // Push Images to GitHub
 
-        // Stop and remove existing containers and Pull new images from the correct repositories and run them
         stage('Deploy') {
             when {
-                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
+                expression { 
+                    return SERVICES.any { service ->
+                        env["BUILD_${service.name.toUpperCase()}"] == 'true'
+                    }
+                }
             }
             steps {
                 script {
                     withCredentials([sshUserPrivateKey(credentialsId: 'forssh', keyFileVariable: 'secret')]) {
                         withEnv(["SSH_KEY_PATH=$secret"]) {
-                            
-                            if (env.BUILD_BACKEND == 'true') {
-                                echo "Deploying backend..."
-                                sh '''
-                                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} "
-                                        sudo docker stop backend || true && sudo docker rm backend || true && \
-                                        sudo docker pull ${BACKEND_IMAGE} && \
-                                        sudo docker run -d --name backend -p 5000:5000 \
-                                        --env-file ~/backend/.env \
-                                        -e FLASK_ENV=production \
-                                        -e CORS_ORIGIN=https://app-dev.yisraelberman.com \
-                                        -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
-                                        -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
-                                        ${BACKEND_IMAGE}
-                                    "
-                                '''
-                            }
-
-                            if (env.BUILD_FRONTEND == 'true') {
-                                echo "Deploying frontend..."
-                                sh '''
-                                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} "
-                                        sudo docker stop frontend || true && sudo docker rm frontend || true && \
-                                        sudo docker pull ${FRONTEND_IMAGE} && \
-                                        sudo docker run -d --name frontend -p 443:3002 \
-                                        -e REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000 \
-                                        -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
-                                        -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
-                                        ${FRONTEND_IMAGE}
-                                    "
-                                '''
+                            SERVICES.each { service ->
+                                if (env["BUILD_${service.name.toUpperCase()}"] == 'true') {
+                                    echo "Deploying ${service.name}..."
+                                    def envFile = service.envFile ? "--env-file ${service.envFile}" : ''
+                                    def extraEnv = service.extraEnv.collect { "-e ${it}" }.join(' ')
+                                    
+                                    sh """
+                                        ssh -o StrictHostKeyChecking=no -i "\$SSH_KEY_PATH" \${SSH_TARGET} "
+                                            sudo docker stop ${service.name} || true && \
+                                            sudo docker rm ${service.name} || true && \
+                                            sudo docker pull ${env["${service.name.toUpperCase()}_IMAGE"]} && \
+                                            sudo docker run -d --name ${service.name} \
+                                            -p ${service.port} \
+                                            ${envFile} \
+                                            ${extraEnv} \
+                                            -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
+                                            -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
+                                            ${env["${service.name.toUpperCase()}_IMAGE"]}
+                                        "
+                                    """
+                                }
                             }
                         }
                     }
