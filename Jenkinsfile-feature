@@ -127,7 +127,6 @@ pipeline {
             }
         } //Start AWS EC2 Instance       
         
-        stages {
         stage('Initialize') {
             steps {
                 script {
@@ -163,10 +162,10 @@ pipeline {
                     SERVICE_NAMES.split().each { service ->
                         env["${service.toUpperCase()}_IMAGE"] = "${REPO_BASE_PATH}/${service}:${branchName}-build-${BUILD_NUMBER}"
                     }
+                    
                 }
             }
         } // Initialize
-
         
         stage('Test') {
             steps {
@@ -280,7 +279,7 @@ pipeline {
                 }
             }
         } // Deploy
-
+ 
     } //stages
 
     post {
