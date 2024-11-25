@@ -30,15 +30,3 @@ CMD ["serve", "-s", "build", "--ssl-cert", "/etc/letsencrypt/live/app.yisraelber
 
 
 
-
-# Build the image
-docker build \
-  --build-arg REACT_APP_API_BASE_URL=https://app.yisraelberman.com/api \
-  -t volunteer-admin:production .
-
-# Run the container
-docker run -d \
-  -p 3001:3001 \
-  -v /etc/letsencrypt:/etc/letsencrypt:ro \
-  --name volunteer-admin \
-  volunteer-admin:production
