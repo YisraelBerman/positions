@@ -173,7 +173,7 @@ pipeline {
                     ).trim()
 
                     def adminfrontendChanges = sh(
-                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/adminfrontend/" || true',
+                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/admin-frontend/" || true',
                         returnStdout: true
                     ).trim()
 
