@@ -57,6 +57,9 @@
 # Allow specific subdirectories in frontend
 !/app/admin-frontend/public/
 !/app/admin-frontend/src/
+!/app/admin-frontend/src/components/
+!/app/admin-frontend/src/components/ui/
+!/app/admin-frontend/src/lib/
 
 # Allow .js, .html, .css files inside specific admin-frontend subdirectories
 !/app/admin-frontend/public/*.js
