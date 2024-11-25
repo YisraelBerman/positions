@@ -19,7 +19,14 @@ app = Flask(__name__)
 
 #dev and prod:
 cors_origins = os.environ.get('CORS_ORIGIN').split(',')
-CORS(app, resources={r"/api/*": {"origins": cors_origins}})
+CORS(app, resources={
+    r"/api/*": {
+        "origins": cors_origins,
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 #local:
 #CORS(app, origins=["http://localhost:3000","http://localhost:3001"])
@@ -242,6 +249,60 @@ def get_locations():
 
     return jsonify(locations)
 
+@app.route('/api/volunteers', methods=['POST'])
+def add_volunteer():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({
+                'status': 'error',
+                'message': 'No data provided'
+            }), 400
+
+        # Prepare volunteer item
+        volunteer_item = {
+            'id': int(data['id']),
+            'name': data['name'],
+            'location': data['location'],
+            'closest_point': int(data['closest_point']),
+            'available': True  # Default to True for new volunteers
+        }
+
+        # Add to DynamoDB
+        volunteers_table.put_item(Item=volunteer_item)
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Volunteer added successfully',
+            'volunteer': volunteer_item
+        }), 201
+
+    except Exception as e:
+        print(f"Error adding volunteer: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/volunteers/<int:volunteer_id>', methods=['DELETE'])
+def delete_volunteer(volunteer_id):
+    try:
+        # Delete from DynamoDB
+        volunteers_table.delete_item(
+            Key={'id': volunteer_id}
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Volunteer deleted successfully'
+        }), 200
+
+    except Exception as e:
+        print(f"Error deleting volunteer: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 if __name__ == '__main__':
     
