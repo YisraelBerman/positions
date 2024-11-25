@@ -265,7 +265,7 @@ def add_volunteer():
             'name': data['name'],
             'location': data['location'],
             'closest_point': int(data['closest_point']),
-            'available': True  # Default to True for new volunteers
+            'available': False  
         }
 
         # Add to DynamoDB
