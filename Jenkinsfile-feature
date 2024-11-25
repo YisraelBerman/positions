@@ -140,13 +140,13 @@ pipeline {
                     def branchName = env.BRANCH_NAME.replaceAll('/', '-')
                     env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:${branchName}-build-${BUILD_NUMBER}"
                     env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${branchName}-build-${BUILD_NUMBER}"
-                    env.ADMIN-FRONTEND_IMAGE = "${env.REPO_PATH}/admin-frontend:${branchName}-build-${BUILD_NUMBER}"
+                    env.ADMINFRONTEND_IMAGE = "${env.REPO_PATH}/adminfrontend:${branchName}-build-${BUILD_NUMBER}"
                     
                     
                     // Initialize flags
                     env.BUILD_BACKEND = 'false'
                     env.BUILD_FRONTEND = 'false'
-                    env.BUILD_ADMIN-FRONTEND = 'false'
+                    env.BUILD_ADMINFRONTEND = 'false'
 
                 }
             }
@@ -173,17 +173,17 @@ pipeline {
                     ).trim()
 
                     def adminfrontendChanges = sh(
-                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/admin-frontend/" || true',
+                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/adminfrontend/" || true',
                         returnStdout: true
                     ).trim()
 
                     env.BACKEND_CHANGED = backendChanges ? 'true' : 'false'
                     env.FRONTEND_CHANGED = frontendChanges ? 'true' : 'false'
-                    env.ADMIN-FRONTEND_CHANGED = adminfrontendChanges ? 'true' : 'false'
+                    env.ADMINFRONTEND_CHANGED = adminfrontendChanges ? 'true' : 'false'
 
                     echo "Backend Changed: ${env.BACKEND_CHANGED}"
                     echo "Frontend Changed: ${env.FRONTEND_CHANGED}"
-                    echo "Admin frontend Changed: ${env.ADMIN-FRONTEND_CHANGED}"
+                    echo "Admin frontend Changed: ${env.ADMINFRONTEND_CHANGED}"
 
                 }
             }
@@ -222,14 +222,14 @@ pipeline {
                 stage('Build Admin Frontend') {
                     when {
                         expression {
-                            return env.ADMIN-FRONTEND_CHANGED == 'true'
+                            return env.ADMINFRONTEND_CHANGED == 'true'
                         }
                     }
                     steps {
                         script {
                             echo 'Changes detected in the admin frontend directory. Building frontend image...'
-                            sh "docker build --build-arg REACT_APP_API_BASE_URL=https://app-dev.yisraelberman.com:5000/api -t ${env.ADMIN-FRONTEND_IMAGE} -f ./app/admin-frontend/dockerfile ./app/admin-frontend"
-                            env.BUILD_ADMIN-FRONTEND = 'true' 
+                            sh "docker build --build-arg REACT_APP_API_BASE_URL=https://app-dev.yisraelberman.com:5000/api -t ${env.ADMINFRONTEND_IMAGE} -f ./app/admin-frontend/dockerfile ./app/admin-frontend"
+                            env.BUILD_ADMINFRONTEND = 'true' 
                         }
                     }
                 } // Build Admin Frontend
@@ -238,7 +238,7 @@ pipeline {
 
         stage('Docker Login') {
             when {
-                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' || env.BUILD_ADMIN-FRONTEND == 'true' }
+                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' || env.BUILD_ADMINFRONTEND == 'true' }
             }
             steps {
                 sh "echo ${env.GITHUB_TOKEN} | docker login ghcr.io -u ${env.GITHUB_USER} --password-stdin"
@@ -275,13 +275,13 @@ pipeline {
                 }
                 stage('Push Admin Frontend Image') {
                     when {
-                        expression { return env.BUILD_ADMIN-FRONTEND == 'true' }
+                        expression { return env.BUILD_ADMINFRONTEND == 'true' }
                     }
                     steps {
                         script {
                             echo 'Pushing admin frontend image to GitHub...'
                             sh """
-                                docker push ${env.ADMIN-FRONTEND_IMAGE}
+                                docker push ${env.ADMINFRONTEND_IMAGE}
                             """
                         }
                     }
@@ -292,7 +292,7 @@ pipeline {
         // Stop and remove existing containers and Pull new images from the correct repositories and run them
         stage('Deploy') {
             when {
-                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' || env.BUILD_ADMIN-FRONTEND == 'true' }
+                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' || env.BUILD_ADMINFRONTEND == 'true' }
             }
             steps {
                 script {
@@ -330,17 +330,17 @@ pipeline {
                                     "
                                 '''
                             }
-                            if (env.BUILD_ADMIN-FRONTEND == 'true') {
+                            if (env.BUILD_ADMINFRONTEND == 'true') {
                                 echo "Deploying admin frontend..."
                                 sh '''
                                     ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" ${SSH_TARGET} "
-                                        sudo docker stop admin-frontend || true && sudo docker rm admin-frontend || true && \
-                                        sudo docker pull ${ADMIN-FRONTEND_IMAGE} && \
-                                        sudo docker run -d --name admin-frontend -p 3001:3001 \
+                                        sudo docker stop adminfrontend || true && sudo docker rm adminfrontend || true && \
+                                        sudo docker pull ${ADMINFRONTEND_IMAGE} && \
+                                        sudo docker run -d --name adminfrontend -p 3001:3001 \
                                         -e REACT_APP_BACKEND_URL=https://app-dev.yisraelberman.com:5000 \
                                         -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
                                         -v /etc/letsencrypt/live/app-dev.yisraelberman.com-0001/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
-                                        ${ADMIN-FRONTEND_IMAGE}
+                                        ${ADMINFRONTEND_IMAGE}
                                     "
                                 '''
                             }
