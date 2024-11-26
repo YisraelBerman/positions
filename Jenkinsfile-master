@@ -389,7 +389,6 @@ pipeline {
                             ${env.BUILD_ADMINFRONTEND == 'true' ? "sudo docker pull ${env.ADMINFRONTEND_IMAGE};" : ''}
                             sudo docker run -d --name adminfrontend -p 3001:3001 \
                             -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \
-
                             -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
                             -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
                             ${env.ADMINFRONTEND_IMAGE};
