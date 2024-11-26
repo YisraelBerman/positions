@@ -361,7 +361,7 @@ pipeline {
                                 sudo docker run -d --name backend -p 5000:5000 \
                                 --env-file ~/backend/.env \
                                 -e FLASK_ENV=production \
-                                -e CORS_ORIGIN=https://app.yisraelberman.com \
+                                -e CORS_ORIGIN="https://app.yisraelberman.com,https://app.yisraelberman.com:3001" \
                                 -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
                                 -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
                                 ${env.BACKEND_IMAGE}
