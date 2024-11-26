@@ -289,7 +289,7 @@ pipeline {
                                 docker build \
                                     --build-arg REACT_APP_API_BASE_URL=https://app.yisraelberman.com:5000/api \
                                     -t ${env.ADMINFRONTEND_IMAGE} \
-                                    -f ./app/admin- frontend/dockerfile ./app/admin-frontend
+                                    -f ./app/admin-frontend/dockerfile ./app/admin-frontend
                             """                        
                             
                             env.BUILD_FRONTEND = 'true' 
