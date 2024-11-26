@@ -19,7 +19,7 @@ EXPOSE 5000
 # Define environment variables with default values
 ENV FLASK_APP=app.py
 ENV FLASK_RUN_HOST=0.0.0.0
-ENV CORS_ORIGIN=https://app.yisraelberman.com
+ENV CORS_ORIGIN=https://app.yisraelberman.com,https://app.yisraelberman.com:3001
 
 # Run gunicorn with SSL support when the container launches
 CMD ["gunicorn", "--certfile", "/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem", "--keyfile", "/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem", "-b", "0.0.0.0:5000", "app:app"]
