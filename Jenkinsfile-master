@@ -78,6 +78,7 @@ pipeline {
                     // Initialize versions with null to detect if they were found in tag description
                     def backendVersion = null
                     def frontendVersion = null
+                    def adminfrontendVersion = null
                     
                     // Trim lines and parse versions
                     descLines.each { line ->
@@ -86,20 +87,25 @@ pipeline {
                             backendVersion = trimmedLine.substring('backend:'.length()).trim()
                         } else if (trimmedLine.startsWith('frontend:')) {
                             frontendVersion = trimmedLine.substring('frontend:'.length()).trim()
+                        } else if (trimmedLine.startsWith('admin-frontend:')) {
+                            adminfrontendVersion = trimmedLine.substring('admin-frontend:'.length()).trim()
                         }
                     }
                     
                     // Set default versions only if not found in tag
                     backendVersion = backendVersion ?: '1.0.0'
                     frontendVersion = frontendVersion ?: '1.0.0'
+                    adminfrontendVersion = adminfrontendVersion ?: '1.0.0'
                     
                     echo "Parsed versions from tag:"
                     echo "Backend from tag: ${backendVersion}"
                     echo "Frontend from tag: ${frontendVersion}"
+                    echo "Admin-Frontend from tag: ${adminfrontendVersion}"
                     
                     // Store original versions
                     env.NEW_BACKEND_VERSION = backendVersion
                     env.NEW_FRONTEND_VERSION = frontendVersion
+                    env.NEW_ADMINFRONTEND_VERSION = adminfrontendVersion
                     
                     // Check for changes
                     def backendChanges = sh(
@@ -112,8 +118,14 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
+                    def adminfrontendChanges = sh(
+                        script: 'git diff --name-only HEAD~1..HEAD | grep "app/admin-frontend/" || true',
+                        returnStdout: true
+                    ).trim()
+
                     env.BACKEND_CHANGED = backendChanges ? 'true' : 'false'
                     env.FRONTEND_CHANGED = frontendChanges ? 'true' : 'false'
+                    env.ADMINFRONTEND_CHANGED = adminfrontendChanges ? 'true' : 'false'
                     
                     // Update app version based on commit message
                     if (commitMessage.startsWith('breaking')) {
@@ -160,6 +172,23 @@ pipeline {
                         env.NEW_FRONTEND_VERSION = "${frontendMajor}.${frontendMinor}.${frontendPatch}"
                         env.BUILD_FRONTEND = 'true'
                     }
+
+                    // Only update admin-frontend version if changed
+                    if (env.ADMINFRONTEND_CHANGED == 'true') {
+                        def (adminfrontendMajor, adminfrontendMinor, adminfrontendPatch) = adminfrontendVersion.tokenize('.')
+                        if (commitMessage.startsWith('breaking')) {
+                            adminfrontendMajor = (adminfrontendMajor.toInteger() + 1).toString()
+                            adminfrontendMinor = '0'
+                            adminfrontendPatch = '0'
+                        } else if (commitMessage.startsWith('feat')) {
+                            adminfrontendMinor = (adminfrontendMinor.toInteger() + 1).toString()
+                            adminfrontendPatch = '0'
+                        } else if (commitMessage.startsWith('fix')) {
+                            adminfrontendPatch = (adminfrontendPatch.toInteger() + 1).toString()
+                        }
+                        env.NEW_ADMINFRONTEND_VERSION = "${adminfrontendMajor}.${adminfrontendMinor}.${adminfrontendPatch}"
+                        env.BUILD_ADMINFRONTEND = 'true'
+                    }
                     
                     // Set new app version
                     env.NEW_VERSION = "v${appMajor}.${appMinor}.${appPatch}.${appBuild}"
@@ -168,6 +197,7 @@ pipeline {
                     echo "App: ${env.NEW_VERSION}"
                     echo "Backend: ${env.NEW_BACKEND_VERSION} (changed: ${env.BACKEND_CHANGED})"
                     echo "Frontend: ${env.NEW_FRONTEND_VERSION} (changed: ${env.FRONTEND_CHANGED})"
+                    echo "admin-Frontend: ${env.NEW_ADMINFRONTEND_VERSION} (changed: ${env.ADMINFRONTEND_CHANGED})"
                     
                     // Set up other environment variables
                     env.GIT_COMMIT_HASH = sh(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true).trim()
@@ -177,6 +207,7 @@ pipeline {
                     // Define image names with versions
                     env.BACKEND_IMAGE = "${env.REPO_PATH}/backend:${env.NEW_BACKEND_VERSION}"
                     env.FRONTEND_IMAGE = "${env.REPO_PATH}/frontend:${env.NEW_FRONTEND_VERSION}"
+                    env.ADMINFRONTEND_IMAGE = "${env.REPO_PATH}/adminfrontend:${env.NEW_ADMINFRONTEND_VERSION}"
                 }
             }
         } // Initialize and Get Versions
@@ -185,7 +216,8 @@ pipeline {
                 script {
                     def tagMessage = """Release ${env.NEW_VERSION}
         backend: ${env.NEW_BACKEND_VERSION}
-        frontend: ${env.NEW_FRONTEND_VERSION}"""
+        frontend: ${env.NEW_FRONTEND_VERSION}
+        admin-frontend: ${env.NEW_ADMINFRONTEND_VERSION}"""
 
                     withCredentials([usernamePassword(credentialsId: 'github', 
                                                 usernameVariable: 'GIT_USERNAME', 
@@ -244,6 +276,26 @@ pipeline {
                         }
                     }
                 }
+                stage('Build admin-Frontend') {
+                    when {
+                        expression {
+                            return env.ADMINFRONTEND_CHANGED == 'true'
+                        }
+                    }
+                    steps {
+                        script {
+                            echo 'Changes detected in the admin-frontend directory. Building admin-frontend image...'
+                            sh """
+                                docker build \
+                                    --build-arg REACT_APP_API_BASE_URL=https://app.yisraelberman.com:5000/api \
+                                    -t ${env.ADMINFRONTEND_IMAGE} \
+                                    -f ./app/admin- frontend/dockerfile ./app/admin-frontend
+                            """                        
+                            
+                            env.BUILD_FRONTEND = 'true' 
+                        }
+                    }
+                }
             }
         } // Build
 
@@ -280,12 +332,23 @@ pipeline {
                         }
                     }
                 }
+                stage('Push admin-Frontend Image') {
+                    when {
+                        expression { return env.BUILD_ADMINFRONTEND == 'true' }
+                    }
+                    steps {
+                        script {
+                            echo "Pushing admin-frontend image version ${env.NEW_ADMINFRONTEND_VERSION}..."
+                            sh "docker push ${env.ADMINFRONTEND_IMAGE}"
+                        }
+                    }
+                }
             }
         } // Push Images to GitHub
 
         stage('Deploy') {
             when {
-                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' }
+                expression { return env.BUILD_BACKEND == 'true' || env.BUILD_FRONTEND == 'true' || env.BUILD_ADMINFRONTEND == 'true' }
             }
             steps {
                 script {
@@ -316,6 +379,20 @@ pipeline {
                             -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
                             -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
                             ${env.FRONTEND_IMAGE};
+                        "
+                        """
+
+                        // Always restart admin-frontend with new version
+                        sh """
+                        ssh -o StrictHostKeyChecking=no -i "$secret" ${env.SSH_TARGET} "
+                            sudo docker stop adminfrontend || true && sudo docker rm adminfrontend || true;
+                            ${env.BUILD_ADMINFRONTEND == 'true' ? "sudo docker pull ${env.ADMINFRONTEND_IMAGE};" : ''}
+                            sudo docker run -d --name adminfrontend -p 3001:3001 \
+                            -e REACT_APP_BACKEND_URL=https://app.yisraelberman.com:5000 \
+
+                            -v /etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:/etc/letsencrypt/live/app.yisraelberman.com/fullchain.pem:ro \
+                            -v /etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:/etc/letsencrypt/live/app.yisraelberman.com/privkey.pem:ro \
+                            ${env.ADMINFRONTEND_IMAGE};
                         "
                         """
                     }
