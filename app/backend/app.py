@@ -16,7 +16,6 @@ from boto3.dynamodb.conditions import Key, Attr
 app = Flask(__name__)
 
 
-
 #dev and prod:
 cors_origins = os.environ.get('CORS_ORIGIN').split(',')
 CORS(app, resources={
